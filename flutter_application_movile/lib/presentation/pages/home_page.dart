@@ -10,6 +10,7 @@ import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart
 import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
 import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
 import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
+import 'package:flutter_application_movile/core/theme/app_theme.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -159,7 +160,29 @@ class _HomePageState extends State<HomePage> {
       ],
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Travel Chatbot'),
+          centerTitle: false,
+          title: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.accentGradient,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.smart_toy, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Wanderly', style: TextStyle(fontWeight: FontWeight.w700)),
+                  SizedBox(height: 2),
+                  Text('Tu compañero de viaje', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            ],
+          ),
           actions: [
             if (_ubicacionCargando)
               const Padding(
@@ -250,10 +273,13 @@ class _HomePageState extends State<HomePage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            color: Colors.orange[100],
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
-                const Icon(Icons.warning, color: Colors.orange),
+                const Icon(Icons.warning_amber_outlined, color: Colors.orange),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -281,7 +307,15 @@ class _HomePageState extends State<HomePage> {
                   itemCount: state.mensajes.length,
                   itemBuilder: (context, index) {
                     final mensaje = state.mensajes[index];
-                    return MensajeChatWidget(mensaje: mensaje);
+                    return AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      switchInCurve: Curves.easeOut,
+                      switchOutCurve: Curves.easeIn,
+                      child: KeyedSubtree(
+                        key: ValueKey(mensaje.id),
+                        child: MensajeChatWidget(mensaje: mensaje),
+                      ),
+                    );
                   },
                 );
               } else if (state is ChatError) {
@@ -309,9 +343,9 @@ class _HomePageState extends State<HomePage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.chat, size: 50, color: Colors.grey),
+                      Icon(Icons.chat_bubble_rounded, size: 50, color: Colors.grey),
                       SizedBox(height: 16),
-                      Text('Bienvenido al Travel Chatbot!'),
+                      Text('Bienvenido a Wanderly!'),
                       SizedBox(height: 8),
                       Text('Pregúntame sobre lugares cercanos', 
                            style: TextStyle(fontSize: 14, color: Colors.grey)),

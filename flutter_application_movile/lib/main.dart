@@ -6,6 +6,7 @@ import 'package:flutter_application_movile/data/repositories/auth_repository_imp
 import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_application_movile/presentation/pages/home_page.dart';
 import 'package:flutter_application_movile/presentation/pages/login_page.dart';
+import 'package:flutter_application_movile/core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,11 +31,9 @@ class MyApp extends StatelessWidget {
           authRepository: context.read<AuthRepositoryImpl>(),
         )..add(CheckAuthStatus()),
         child: MaterialApp(
-          title: 'Travel Chatbot',
-          theme: ThemeData(
-            primarySwatch: Colors.blue,
-            useMaterial3: true,
-          ),
+          title: 'Wanderly',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light(),
           home: const AuthWrapper(),
         ),
       ),
