@@ -96,19 +96,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         password: event.password,
         nombre: event.nombre,
       );
-      
-      // Después del registro, iniciar sesión automáticamente
-      await authRepository.signInWithEmail(
-        email: event.email,
-        password: event.password,
-      );
-      
-      final usuario = await authRepository.getUsuarioActual();
-      if (usuario != null) {
-        emit(AuthAuthenticated(usuario));
-      } else {
-        emit(const AuthError('Error al obtener datos del usuario'));
-      }
+      // Tras el registro exitoso, permanecemos en estado no autenticado
+      // para que el usuario vuelva al Login y pueda iniciar sesión.
+      emit(AuthUnauthenticated());
     } catch (e) {
       emit(AuthError(e.toString().replaceAll('Exception: ', '')));
     }

@@ -4,11 +4,13 @@ import 'package:flutter_application_movile/core/theme/app_theme.dart';
 class InputChatWidget extends StatefulWidget {
   final Function(String) onEnviarMensaje;
   final bool estaCargando;
+  final VoidCallback? onUsarUbicacion;
 
   const InputChatWidget({
     super.key,
     required this.onEnviarMensaje,
     required this.estaCargando,
+    this.onUsarUbicacion,
   });
 
   @override
@@ -41,6 +43,30 @@ class _InputChatWidgetState extends State<InputChatWidget> {
                   ),
                 ),
                 const SizedBox(width: 10),
+                if (widget.onUsarUbicacion != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: InkWell(
+                      onTap: widget.onUsarUbicacion,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.my_location, color: Colors.blueGrey),
+                      ),
+                    ),
+                  ),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 200),
                   child: widget.estaCargando

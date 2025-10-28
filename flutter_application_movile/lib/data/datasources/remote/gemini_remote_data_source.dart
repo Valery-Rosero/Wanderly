@@ -84,6 +84,15 @@ REGLAS:
 ✅ Usa un tono cálido, útil y fluido.
 
 ❌ No uses formato especial, efectos ni emojis innecesarios.
+
+ESTRUCTURA ADICIONAL PARA MAPA:
+Al final de tu respuesta, agrega UNA línea que comience exactamente con:
+JSON_PLACES: {"places":[{"name":"Nombre","lat":12.34,"lng":-56.78,"address":"Dirección","type":"cafeteria"}]}
+
+Reglas para JSON_PLACES:
+- Debe ser JSON válido en una sola línea.
+- Incluye de 3 a 6 lugares relevantes cercanos.
+- Si no estás seguro de coordenadas, usa valores aproximados plausibles de la zona.
 ''';
 
       final response = await _model.generateContent([Content.text(prompt)]);

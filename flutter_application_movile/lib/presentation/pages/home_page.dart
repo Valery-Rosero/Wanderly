@@ -11,6 +11,10 @@ import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart
 import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
 import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
 import 'package:flutter_application_movile/core/theme/app_theme.dart';
+import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart' as latlng;
+import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,15 +26,20 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late ChatBloc _chatBloc;
   Position? _ubicacionActual;
+  latlng.LatLng? _ubicacionSeleccionada;
   bool _ubicacionCargando = false;
   String? _errorUbicacion;
   bool _chatInicializado = false;
+  final TextEditingController _buscarCtrl = TextEditingController();
+  bool _buscandoDireccion = false;
+  String? _errorBusqueda;
 
   @override
   void initState() {
     super.initState();
     print('🏠 HomePage initState llamado');
     _inicializarChat();
+    // Solicitar ubicación al inicio para centrar el mapa y dar contexto.
     _obtenerUbicacion();
   }
 
@@ -74,6 +83,12 @@ class _HomePageState extends State<HomePage> {
       
       // ✅ USAR EL MÉTODO CORRECTO: getCurrentLocation()
       _ubicacionActual = await locationDataSource.getCurrentLocation();
+      if (_ubicacionActual != null) {
+        _ubicacionSeleccionada = latlng.LatLng(
+          _ubicacionActual!.latitude,
+          _ubicacionActual!.longitude,
+        );
+      }
       
       if (_ubicacionActual != null) {
         print('📍 Ubicación obtenida: ${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}');
@@ -103,6 +118,50 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _buscarDireccion() async {
+    final query = _buscarCtrl.text.trim();
+    if (query.isEmpty) return;
+    setState(() {
+      _buscandoDireccion = true;
+      _errorBusqueda = null;
+    });
+
+    try {
+      final geocoder = GeocodingRemoteDataSource();
+      final result = await geocoder.geocodeAddress(query);
+      if (result == null) {
+        setState(() {
+          _errorBusqueda = 'No se encontró la dirección';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se encontró la dirección')),
+        );
+      } else {
+        setState(() {
+          _ubicacionSeleccionada = result;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Ubicación establecida: ${result.latitude.toStringAsFixed(4)}, ${result.longitude.toStringAsFixed(4)}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorBusqueda = 'Error buscando dirección: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error buscando dirección: $e')),
+      );
+    } finally {
+      setState(() {
+        _buscandoDireccion = false;
+      });
+    }
+  }
+
   void _enviarMensaje(String mensaje) {
     print('📤 Intentando enviar mensaje: $mensaje');
     
@@ -114,32 +173,10 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    if (_ubicacionCargando) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Obteniendo ubicación, por favor espera...')),
-      );
-      return;
-    }
-
-    if (_ubicacionActual != null) {
-      print('📍 Enviando mensaje con ubicación: ${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}');
-      _chatBloc.add(EnviarMensajeEvent(
-        mensaje: mensaje,
-        latitud: _ubicacionActual!.latitude,
-        longitud: _ubicacionActual!.longitude,
-      ));
-    } else {
-      print('❌ Ubicación no disponible para enviar mensaje');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_errorUbicacion ?? 'Ubicación no disponible'),
-          action: SnackBarAction(
-            label: 'Reintentar',
-            onPressed: _obtenerUbicacion,
-          ),
-        ),
-      );
-    }
+    // Enviar mensaje usando ubicación seleccionada (manual o automática).
+    final double lat = _ubicacionSeleccionada?.latitude ?? _ubicacionActual?.latitude ?? 0.0;
+    final double lng = _ubicacionSeleccionada?.longitude ?? _ubicacionActual?.longitude ?? 0.0;
+    _chatBloc.add(EnviarMensajeEvent(mensaje: mensaje, latitud: lat, longitud: lng));
   }
 
   void _cerrarSesion() {
@@ -212,7 +249,7 @@ class _HomePageState extends State<HomePage> {
               IconButton(
                 icon: const Icon(Icons.location_off, color: Colors.red),
                 onPressed: _obtenerUbicacion,
-                tooltip: 'Reintentar ubicación',
+                tooltip: 'Permitir ubicación',
               ),
             IconButton(
               icon: const Icon(Icons.logout),
@@ -236,19 +273,6 @@ class _HomePageState extends State<HomePage> {
             const CircularProgressIndicator(),
             const SizedBox(height: 20),
             const Text('Inicializando chatbot...'),
-            if (_ubicacionCargando) ...[
-              const SizedBox(height: 10),
-              const Text('Obteniendo ubicación...', style: TextStyle(fontSize: 12)),
-            ],
-            if (_errorUbicacion != null) ...[
-              const SizedBox(height: 10),
-              Text('Error: $_errorUbicacion', style: const TextStyle(fontSize: 12, color: Colors.red)),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _obtenerUbicacion,
-                child: const Text('Reintentar Ubicación'),
-              ),
-            ],
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
@@ -273,13 +297,14 @@ class _HomePageState extends State<HomePage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.orange[50],
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(Icons.warning_amber_outlined, color: Colors.orange),
+                const Icon(Icons.location_disabled, color: Colors.orange),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -289,7 +314,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 TextButton(
                   onPressed: _obtenerUbicacion,
-                  child: const Text('Reintentar'),
+                  child: const Text('Permitir ubicación'),
                 ),
               ],
             ),
@@ -329,8 +354,8 @@ class _HomePageState extends State<HomePage> {
                         onPressed: () {
                           _chatBloc.add(EnviarMensajeEvent(
                             mensaje: 'Hola',
-                            latitud: _ubicacionActual?.latitude ?? 4.6097,
-                            longitud: _ubicacionActual?.longitude ?? -74.0817,
+                            latitud: 0.0,
+                            longitud: 0.0,
                           ));
                         },
                         child: const Text('Reintentar Chat'),
@@ -347,7 +372,7 @@ class _HomePageState extends State<HomePage> {
                       SizedBox(height: 16),
                       Text('Bienvenido a Wanderly!'),
                       SizedBox(height: 8),
-                      Text('Pregúntame sobre lugares cercanos', 
+                      Text('Pregúntame sobre lugares interesantes', 
                            style: TextStyle(fontSize: 14, color: Colors.grey)),
                     ],
                   ),
@@ -367,15 +392,180 @@ class _HomePageState extends State<HomePage> {
             },
           ),
         ),
+        // Barra de búsqueda principal (ubicada sobre el mapa)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _buscarCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Buscar dirección o lugar…',
+                      prefixIcon: Icon(Icons.search),
+                      border: InputBorder.none,
+                    ),
+                    onSubmitted: (_) => _buscarDireccion(),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _buscandoDireccion ? null : _buscarDireccion,
+                  child: _buscandoDireccion
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Buscar'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Mapa embebido con ubicación y lugares sugeridos
+        BlocBuilder<ChatBloc, ChatState>(
+          builder: (context, state) {
+            final lugares = state is ChatLoaded ? state.lugares : <LugarEntity>[];
+            return _buildMap(lugares);
+          },
+        ),
+        if (_ubicacionSeleccionada != null || _ubicacionActual != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
+                  ],
+                ),
+                child: Text(
+                  'Lat: ${(_ubicacionSeleccionada?.latitude ?? _ubicacionActual!.latitude).toStringAsFixed(5)} · Lng: ${(_ubicacionSeleccionada?.longitude ?? _ubicacionActual!.longitude).toStringAsFixed(5)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+            ),
+          ),
         BlocBuilder<ChatBloc, ChatState>(
           builder: (context, state) {
             return InputChatWidget(
               onEnviarMensaje: _enviarMensaje,
               estaCargando: state is ChatLoading,
+              onUsarUbicacion: _obtenerUbicacion,
             );
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildMap(List<LugarEntity> lugares) {
+    if (_ubicacionActual == null && _ubicacionSeleccionada == null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Container(
+          height: 200,
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(16),
+          ),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.map, color: Colors.grey),
+              SizedBox(height: 8),
+              Text('Activa tu ubicación para ver el mapa'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final center = _ubicacionSeleccionada ??
+        latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude);
+    final markers = <Marker>[
+      // Marker del usuario
+      Marker(
+        point: center,
+        width: 40,
+        height: 40,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: AppTheme.accentGradient,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8),
+            ],
+          ),
+          child: const Icon(Icons.person_pin_circle, color: Colors.white),
+        ),
+      ),
+      // Markers de lugares sugeridos
+      ...lugares.map((l) => Marker(
+            point: latlng.LatLng(l.latitud, l.longitud),
+            width: 34,
+            height: 34,
+            child: Tooltip(
+              message: '${l.nombre}\n${l.direccion}',
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6),
+                  ],
+                ),
+                child: const Icon(Icons.location_pin, color: Colors.redAccent),
+              ),
+            ),
+          )),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SizedBox(
+          height: 260,
+          child: Stack(
+            children: [
+              FlutterMap(
+                options: MapOptions(
+                  initialCenter: center,
+                  initialZoom: 14,
+                  onTap: (tapPos, point) {
+                    setState(() {
+                      _ubicacionSeleccionada = point;
+                    });
+                  },
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    subdomains: const ['a', 'b', 'c'],
+                    userAgentPackageName: 'com.example.wanderly',
+                  ),
+                  MarkerLayer(markers: markers),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

@@ -1,30 +1,39 @@
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
 
 class LocationDataSource {
   /// Verifica y solicita permisos de ubicación
   Future<LocationPermission> _checkPermissions() async {
-    // Verificar si los servicios de ubicación están habilitados
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw LocationServiceDisabledException();
+    // Verificar servicios — en web no bloqueamos si falla
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled && !kIsWeb) {
+        throw LocationServiceDisabledException();
+      }
+    } catch (_) {
+      // Ignorar fallos del chequeo en web
     }
 
-    // Verificar permisos
-    LocationPermission permission = await Geolocator.checkPermission();
-    
+    // En web, forzar la solicitud directa de permiso para mostrar el prompt
+    if (kIsWeb) {
+      final webPermission = await Geolocator.requestPermission();
+      if (webPermission == LocationPermission.denied || webPermission == LocationPermission.deniedForever) {
+        throw LocationPermissionDeniedException();
+      }
+      return webPermission;
+    }
+
+    // En plataformas no-web, flujo estándar check → request
+    var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      // Solicitar permisos si están denegados
       permission = await Geolocator.requestPermission();
-      
       if (permission == LocationPermission.denied) {
         throw LocationPermissionDeniedException();
       }
     }
-    
     if (permission == LocationPermission.deniedForever) {
       throw LocationPermissionPermanentlyDeniedException();
     }
-    
     return permission;
   }
 
@@ -36,8 +45,8 @@ class LocationDataSource {
 
       // Obtener ubicación actual con alta precisión
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-        timeLimit: const Duration(seconds: 15),
+        desiredAccuracy: kIsWeb ? LocationAccuracy.high : LocationAccuracy.best,
+        timeLimit: const Duration(seconds: 20),
       );
     } on LocationServiceDisabledException {
       throw Exception(
@@ -49,6 +58,15 @@ class LocationDataSource {
       throw Exception(
           'Permisos de ubicación denegados permanentemente. Por favor, habilita los permisos manualmente en la configuración de la aplicación.');
     } catch (e) {
+      // Fallback: intentar última ubicación conocida
+      final last = await getLastKnownLocation();
+      if (last != null) {
+        return last;
+      }
+      // Mensaje más claro para web
+      if (kIsWeb) {
+        throw Exception('Error al obtener la ubicación: verifica permisos en tu navegador (icono de candado) y habilita geolocalización para este sitio. Detalle: $e');
+      }
       throw Exception('Error al obtener la ubicación: $e');
     }
   }

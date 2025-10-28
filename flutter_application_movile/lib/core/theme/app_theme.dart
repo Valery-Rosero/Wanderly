@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 class AppTheme {
   // 🎨 Colores base (constantes de uso global)
@@ -14,6 +15,9 @@ class AppTheme {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  // ✅ Alias para compatibilidad con el resto de la app
+  static const LinearGradient accentGradient = mainGradient;
 
   // 🌞 Tema claro
   static ThemeData light() {
@@ -61,10 +65,13 @@ class AppTheme {
         contentTextStyle: TextStyle(color: _textLight),
         behavior: SnackBarBehavior.floating,
       ),
-      pageTransitionsTheme: PageTransitionsTheme(
-        builders: const {
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
           TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
         },
       ),
     );
