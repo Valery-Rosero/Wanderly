@@ -10,6 +10,7 @@ import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart
 import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
 import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
 import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
+import 'package:flutter_application_movile/presentation/pages/edit_profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -191,6 +192,18 @@ class _HomePageState extends State<HomePage> {
                 onPressed: _obtenerUbicacion,
                 tooltip: 'Reintentar ubicación',
               ),
+            IconButton(
+              icon: const Icon(Icons.person),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const EditProfilePage(),
+                  ),
+                );
+              },
+              tooltip: 'Editar perfil',
+            ),
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: _cerrarSesion,
