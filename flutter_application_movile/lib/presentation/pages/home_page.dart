@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart' as latlng;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
+
+import 'package:flutter_application_movile/core/theme/app_theme.dart';
 import 'package:flutter_application_movile/data/datasources/local/location_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
 import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
+import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
 import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
 import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart' as latlng;
-import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,6 +36,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _buscarCtrl = TextEditingController();
   bool _buscandoDireccion = false;
   String? _errorBusqueda;
+  final MapController _mapController = MapController();
 
   @override
   void initState() {
@@ -78,44 +82,125 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      print('📍 Solicitando ubicación...');
-      final locationDataSource = LocationDataSource();
-      
-      // ✅ USAR EL MÉTODO CORRECTO: getCurrentLocation()
-      _ubicacionActual = await locationDataSource.getCurrentLocation();
-      if (_ubicacionActual != null) {
-        _ubicacionSeleccionada = latlng.LatLng(
-          _ubicacionActual!.latitude,
-          _ubicacionActual!.longitude,
-        );
+      // Check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _errorUbicacion = 'Los servicios de ubicación están deshabilitados. Por favor, actívalos para una mejor experiencia.';
+          _ubicacionCargando = false;
+        });
+        return;
       }
-      
-      if (_ubicacionActual != null) {
-        print('📍 Ubicación obtenida: ${_ubicacionActual!.latitude}, ${_ubicacionActual!.longitude}');
-      } else {
-        print('📍 Ubicación es null');
+
+      // Check location permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _errorUbicacion = 'Para brindarte sugerencias personalizadas, necesitamos acceso a tu ubicación. Puedes habilitarlo en la configuración.';
+            _ubicacionCargando = false;
+          });
+          return;
+        }
       }
-    } catch (e) {
-      print('❌ Error obteniendo ubicación: $e');
-      setState(() {
-        _errorUbicacion = e.toString();
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error de ubicación: ${e.toString().replaceAll("Exception: ", "")}'),
-          backgroundColor: Colors.orange,
-          action: SnackBarAction(
-            label: 'Reintentar',
-            onPressed: _obtenerUbicacion,
-          ),
-        ),
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _errorUbicacion = 'Los permisos de ubicación están permanentemente denegados. Por favor, habilítalos en la configuración del navegador para obtener sugerencias personalizadas.';
+          _ubicacionCargando = false;
+        });
+        return;
+      }
+
+      // Get current position with highest accuracy
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+        timeLimit: const Duration(seconds: 15),
       );
-    } finally {
+
+      // Verify accuracy and retry if needed
+      if (position.accuracy > 50) {
+        print('🎯 Precisión inicial: ${position.accuracy}m - Intentando mejorar...');
+        
+        // Try to get a more accurate position
+        try {
+          Position betterPosition = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.best,
+            timeLimit: const Duration(seconds: 10),
+          );
+          
+          if (betterPosition.accuracy < position.accuracy) {
+            position = betterPosition;
+            print('✅ Precisión mejorada: ${position.accuracy}m');
+          }
+        } catch (e) {
+          print('⚠️ No se pudo mejorar la precisión, usando posición inicial');
+        }
+      }
+
       setState(() {
+        _ubicacionActual = position;
+        _ubicacionCargando = false;
+      });
+
+      // Auto-center map on user location with high precision
+      final userLocation = latlng.LatLng(position.latitude, position.longitude);
+      _mapController.move(userLocation, 16.0); // Higher zoom for precision
+      
+      // Start continuous location tracking for better accuracy
+      _startLocationTracking();
+      
+      // Generate initial location-based suggestions
+      _generateLocationBasedSuggestions(userLocation);
+
+      print('📍 Ubicación obtenida con precisión: ${position.accuracy}m');
+      print('📍 Coordenadas: ${position.latitude}, ${position.longitude}');
+
+    } catch (e) {
+      setState(() {
+        _errorUbicacion = 'No pudimos obtener tu ubicación en este momento. Puedes seleccionar manualmente un lugar en el mapa.';
         _ubicacionCargando = false;
       });
     }
+  }
+
+  StreamSubscription<Position>? _locationSubscription;
+
+  void _startLocationTracking() {
+    // Cancel any existing subscription
+    _locationSubscription?.cancel();
+    
+    // Start continuous location tracking with high accuracy
+    _locationSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 5, // Update every 5 meters
+        timeLimit: Duration(seconds: 10),
+      ),
+    ).listen(
+      (Position position) {
+        // Only update if the new position is significantly more accurate or different
+        if (_ubicacionActual == null || 
+            position.accuracy < _ubicacionActual!.accuracy ||
+            Geolocator.distanceBetween(
+              _ubicacionActual!.latitude, 
+              _ubicacionActual!.longitude,
+              position.latitude, 
+              position.longitude
+            ) > 10) {
+          
+          setState(() {
+            _ubicacionActual = position;
+          });
+          
+          print('🔄 Ubicación actualizada - Precisión: ${position.accuracy}m');
+        }
+      },
+      onError: (error) {
+        print('❌ Error en seguimiento de ubicación: $error');
+      },
+    );
   }
 
   Future<void> _buscarDireccion() async {
@@ -338,12 +423,17 @@ class _HomePageState extends State<HomePage> {
                       switchOutCurve: Curves.easeIn,
                       child: KeyedSubtree(
                         key: ValueKey(mensaje.id),
-                        child: MensajeChatWidget(mensaje: mensaje),
+                        child: MensajeChatWidget(
+                          mensaje: mensaje,
+                          onPlaceTap: _centerOnPlace,
+                          lugares: state.lugares,
+                        ),
                       ),
                     );
                   },
                 );
-              } else if (state is ChatError) {
+              }
+              else if (state is ChatError) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -497,42 +587,104 @@ class _HomePageState extends State<HomePage> {
 
     final center = _ubicacionSeleccionada ??
         latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude);
+    
     final markers = <Marker>[
-      // Marker del usuario
+      // Enhanced user location marker
       Marker(
         point: center,
-        width: 40,
-        height: 40,
+        width: 50,
+        height: 50,
         child: Container(
           decoration: BoxDecoration(
             gradient: AppTheme.accentGradient,
             shape: BoxShape.circle,
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8),
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.3),
+                blurRadius: 12,
+                spreadRadius: 2,
+              ),
             ],
+            border: Border.all(color: Colors.white, width: 3),
           ),
-          child: const Icon(Icons.person_pin_circle, color: Colors.white),
+          child: const Icon(
+            Icons.my_location,
+            color: Colors.white,
+            size: 24,
+          ),
         ),
       ),
-      // Markers de lugares sugeridos
-      ...lugares.map((l) => Marker(
-            point: latlng.LatLng(l.latitud, l.longitud),
-            width: 34,
-            height: 34,
-            child: Tooltip(
-              message: '${l.nombre}\n${l.direccion}',
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6),
+      
+      // Enhanced markers for chatbot recommended places
+      ...lugares.asMap().entries.map((entry) {
+        final index = entry.key;
+        final lugar = entry.value;
+        
+        return Marker(
+          point: latlng.LatLng(lugar.latitud, lugar.longitud),
+          width: 45,
+          height: 45,
+          child: GestureDetector(
+            onTap: () => _centerOnPlace(lugar),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.deepPurple.shade400,
+                    Colors.purple.shade600,
                   ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                child: const Icon(Icons.location_pin, color: Colors.redAccent),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purple.withOpacity(0.4),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    _getPlaceIcon(lugar.tipoLugar),
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  // Recommendation number badge
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade600,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          )),
+          ),
+        );
+      }),
     ];
 
     return Padding(
@@ -544,23 +696,148 @@ class _HomePageState extends State<HomePage> {
           child: Stack(
             children: [
               FlutterMap(
+                mapController: _mapController,
                 options: MapOptions(
                   initialCenter: center,
-                  initialZoom: 14,
+                  initialZoom: 14.0,
+                  minZoom: 3.0,
+                  maxZoom: 18.0,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all,
+                  ),
                   onTap: (tapPos, point) {
                     setState(() {
                       _ubicacionSeleccionada = point;
                     });
                   },
+                  onMapEvent: (MapEvent mapEvent) {
+                    if (mapEvent is MapEventMoveEnd) {
+                      // Trigger dynamic suggestions when map stops moving
+                      _onMapMoveEnd(mapEvent.camera.center);
+                    }
+                  },
                 ),
                 children: [
+                  // Enhanced OpenStreetMap tile layer with better quality and caching
                   TileLayer(
                     urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                     subdomains: const ['a', 'b', 'c'],
-                    userAgentPackageName: 'com.example.wanderly',
+                    userAgentPackageName: 'com.wanderly.app',
+                    maxZoom: 19,
+                    minZoom: 3,
+                    // Enhanced tile loading for better performance
+                    tileProvider: NetworkTileProvider(),
+                    // Better error handling and fallback
+                    errorTileCallback: (tile, error, stackTrace) {
+                      print('🗺️ Error loading tile: $error');
+                    },
+                    // Improved tile display settings
+                    tileDisplay: const TileDisplay.fadeIn(
+                      duration: Duration(milliseconds: 200),
+                    ),
+                    // Better caching and performance
+                    maxNativeZoom: 19,
+                    zoomOffset: 0,
+                    additionalOptions: const {
+                      'attribution': '© OpenStreetMap contributors',
+                    },
                   ),
                   MarkerLayer(markers: markers),
                 ],
+              ),
+              // Zoom controls
+              Positioned(
+                right: 16,
+                top: 16,
+                child: Column(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                topRight: Radius.circular(8),
+                              ),
+                              onTap: () {
+                                _mapController.move(
+                                  _mapController.camera.center,
+                                  _mapController.camera.zoom + 1,
+                                );
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Icon(Icons.add, size: 20),
+                              ),
+                            ),
+                          ),
+                          Container(
+                            height: 1,
+                            color: Colors.grey[300],
+                          ),
+                          Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: const BorderRadius.only(
+                                bottomLeft: Radius.circular(8),
+                                bottomRight: Radius.circular(8),
+                              ),
+                              onTap: () {
+                                _mapController.move(
+                                  _mapController.camera.center,
+                                  _mapController.camera.zoom - 1,
+                                );
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Icon(Icons.remove, size: 20),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Center on user location button
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: _centerOnUserLocation,
+                          child: const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: Icon(Icons.my_location, size: 20, color: Colors.blue),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -575,6 +852,144 @@ class _HomePageState extends State<HomePage> {
     if (_chatInicializado) {
       _chatBloc.close();
     }
+    // Cancel location subscription to prevent memory leaks
+    _locationSubscription?.cancel();
     super.dispose();
   }
+
+  void _centerOnUserLocation() {
+    if (_ubicacionActual != null) {
+      final userLocation = latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude);
+      _mapController.move(userLocation, 15.0);
+      setState(() {
+        _ubicacionSeleccionada = userLocation;
+      });
+    }
+  }
+
+  void _onMapMoveEnd(latlng.LatLng center) {
+    // Trigger dynamic suggestions based on the new map center
+    _generateLocationBasedSuggestions(center);
+  }
+
+  void _generateLocationBasedSuggestions(latlng.LatLng location) {
+    // This method will generate contextual suggestions based on the location
+    // For now, we'll add a simple implementation that can be enhanced later
+    final lat = location.latitude;
+    final lng = location.longitude;
+    
+    // For now, we'll just print the suggestion to console
+    // This can be enhanced later with a proper event system for automatic suggestions
+    print('🗺️ Área explorable: ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}');
+    print('💡 Sugerencia: El usuario puede preguntar sobre restaurantes, atracciones, hoteles en esta área');
+  }
+
+  // Helper method to get appropriate icon for place type
+  IconData _getPlaceIcon(String? tipo) {
+    if (tipo == null) return Icons.place;
+    
+    switch (tipo.toLowerCase()) {
+      case 'restaurant':
+      case 'restaurante':
+      case 'food':
+      case 'comida':
+        return Icons.restaurant;
+      case 'hotel':
+      case 'lodging':
+      case 'hospedaje':
+        return Icons.hotel;
+      case 'tourist_attraction':
+      case 'attraction':
+      case 'atraccion':
+      case 'turismo':
+        return Icons.camera_alt;
+      case 'shopping_mall':
+      case 'store':
+      case 'tienda':
+      case 'compras':
+        return Icons.shopping_bag;
+      case 'hospital':
+      case 'health':
+      case 'salud':
+        return Icons.local_hospital;
+      case 'gas_station':
+      case 'gasolina':
+        return Icons.local_gas_station;
+      case 'bank':
+      case 'atm':
+      case 'banco':
+        return Icons.account_balance;
+      case 'park':
+      case 'parque':
+        return Icons.park;
+      case 'museum':
+      case 'museo':
+        return Icons.museum;
+      case 'church':
+      case 'iglesia':
+        return Icons.church;
+      default:
+        return Icons.place;
+    }
+  }
+
+  // Method to smoothly center map on a specific place
+  void _centerOnPlace(LugarEntity lugar) {
+    final placeLocation = latlng.LatLng(lugar.latitud, lugar.longitud);
+    
+    // Smooth animation to center on the place
+    _mapController.move(placeLocation, 17.0);
+    
+    // Update selected location
+    setState(() {
+      _ubicacionSeleccionada = placeLocation;
+    });
+    
+    // Show a snackbar with place information
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              _getPlaceIcon(lugar.tipoLugar),
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    lugar.nombre,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (lugar.direccion.isNotEmpty)
+                    Text(
+                      lugar.direccion,
+                      style: const TextStyle(fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.deepPurple.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    
+    print('🎯 Centrado en: ${lugar.nombre} (${lugar.latitud}, ${lugar.longitud})');
+  }
+
 }
