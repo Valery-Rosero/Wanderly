@@ -16,12 +16,21 @@ class UsuarioModel {
   });
 
   factory UsuarioModel.fromJson(Map<String, dynamic> json) {
+    final id = json['id'] as String? ?? '';
+    final email = json['email'] as String? ?? '';
+    final nombre = json['nombre'] as String?;
+    final fotoPerfil = json['foto_perfil'] as String?;
+    final createdRaw = json['created_at'];
+    final createdAt = (createdRaw is String && createdRaw.isNotEmpty)
+        ? (DateTime.tryParse(createdRaw) ?? DateTime.now())
+        : DateTime.now();
+
     return UsuarioModel(
-      id: json['id'],
-      email: json['email'],
-      nombre: json['nombre'],
-      fotoPerfil: json['foto_perfil'],
-      createdAt: DateTime.parse(json['created_at']),
+      id: id,
+      email: email,
+      nombre: nombre,
+      fotoPerfil: fotoPerfil,
+      createdAt: createdAt,
     );
   }
 

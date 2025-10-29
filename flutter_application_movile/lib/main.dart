@@ -6,6 +6,7 @@ import 'package:flutter_application_movile/data/repositories/auth_repository_imp
 import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_application_movile/presentation/pages/home_page.dart';
 import 'package:flutter_application_movile/presentation/pages/login_page.dart';
+import 'package:flutter_application_movile/presentation/pages/register_page.dart';
 import 'package:flutter_application_movile/core/theme/app_theme.dart';
 
 void main() async {
@@ -35,6 +36,11 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(),
           home: const AuthWrapper(),
+          routes: {
+            '/home': (_) => const HomePage(),
+            '/login': (_) => LoginPage(),
+            '/register': (_) => const RegisterPage(),
+          },
         ),
       ),
     );

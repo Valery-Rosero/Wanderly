@@ -3,12 +3,56 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_application_movile/core/theme/app_theme.dart';
 import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
 
-class RegisterPage extends StatelessWidget {
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({super.key});
+
+  @override
+  State<RegisterPage> createState() => _RegisterPageState();
+}
+
+class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController nombreController = TextEditingController();
 
-  RegisterPage({super.key});
+  String? _errorMessage;
+
+  bool _isValidEmail(String email) {
+    final regex = RegExp(r"^[^\s@]+@[^\s@]+\.[^\s@]+$");
+    return regex.hasMatch(email);
+  }
+
+  void _submit(BuildContext context) {
+    final nombre = nombreController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (nombre.isEmpty || email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Por favor completa todos los campos');
+      return;
+    }
+    if (nombre.length < 3) {
+      setState(() => _errorMessage = 'El nombre debe tener al menos 3 caracteres');
+      return;
+    }
+    if (!_isValidEmail(email)) {
+      setState(() => _errorMessage = 'Ingresa un email válido');
+      return;
+    }
+    if (password.length < 6) {
+      setState(() => _errorMessage = 'La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    setState(() => _errorMessage = null);
+    context.read<AuthBloc>().add(
+          SignUpRequested(
+            email: email,
+            password: password,
+            nombre: nombre,
+          ),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,27 +97,15 @@ class RegisterPage extends StatelessWidget {
                       padding: const EdgeInsets.all(20.0),
                       child: BlocConsumer<AuthBloc, AuthState>(
                         listener: (context, state) {
-                          if (state is AuthError) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(state.message)),
-                            );
-                          } else if (state is AuthUnauthenticated) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Registro exitoso')),
-                            );
-                            Navigator.pop(context);
+                          if (state is AuthAuthenticated) {
+                            // Navegar a Home y evitar volver a registro
+                            Navigator.pushReplacementNamed(context, '/home');
+                          } else if (state is AuthError) {
+                            setState(() => _errorMessage = state.message);
                           }
                         },
                         builder: (context, state) {
-                          if (state is AuthLoading) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: const [
-                                LinearProgressIndicator(),
-                              ],
-                            );
-                          }
-
+                          final isLoading = state is AuthLoading;
                           return Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -102,18 +134,53 @@ class RegisterPage extends StatelessWidget {
                                   prefixIcon: Icon(Icons.lock_outline),
                                 ),
                               ),
+                              const SizedBox(height: 12),
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                switchInCurve: Curves.easeOut,
+                                switchOutCurve: Curves.easeIn,
+                                child: (_errorMessage != null)
+                                    ? Container(
+                                        key: const ValueKey('error'),
+                                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.red.withOpacity(0.2)),
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Icon(Icons.error_outline, color: Colors.red, size: 18),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                _errorMessage!,
+                                                style: const TextStyle(color: Colors.red),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
                               const SizedBox(height: 20),
                               ElevatedButton(
-                                onPressed: () {
-                                  context.read<AuthBloc>().add(
-                                        SignUpRequested(
-                                          email: emailController.text.trim(),
-                                          password: passwordController.text.trim(),
-                                          nombre: nombreController.text.trim(),
+                                onPressed: isLoading ? null : () => _submit(context),
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: isLoading
+                                      ? const SizedBox(
+                                          key: ValueKey('loading'),
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Text(
+                                          key: ValueKey('text'),
+                                          'Registrarse',
                                         ),
-                                      );
-                                },
-                                child: const Text('Registrarse'),
+                                ),
                               ),
                             ],
                           );
