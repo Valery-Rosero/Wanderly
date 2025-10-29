@@ -18,7 +18,6 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _nombreCtrl = TextEditingController();
-  final _apellidoCtrl = TextEditingController();
   final _ubicacionCtrl = TextEditingController();
   double? _baseLat;
   double? _baseLon;
@@ -26,6 +25,15 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _guardando = false;
   late List<String> _ciudades;
   String? _ciudadSeleccionada;
+
+  String _toTitleCase(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return trimmed;
+    final words = trimmed.toLowerCase().split(RegExp(r"\s+"));
+    return words
+        .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+        .join(' ');
+  }
 
   @override
   void initState() {
@@ -51,7 +59,6 @@ class _ProfilePageState extends State<ProfilePage> {
         final lp = await local.getProfile(userId);
         if (lp != null) {
           _nombreCtrl.text = lp.nombre ?? '';
-          _apellidoCtrl.text = lp.apellido ?? '';
           _ubicacionCtrl.text = lp.ubicacionBase ?? '';
           _ciudadSeleccionada = lp.ubicacionBase;
           if (_ciudadSeleccionada != null && !_ciudades.contains(_ciudadSeleccionada)) {
@@ -68,7 +75,6 @@ class _ProfilePageState extends State<ProfilePage> {
       final rp = await remote.obtenerPerfil(userId);
       if (rp != null) {
         _nombreCtrl.text = rp.nombre ?? _nombreCtrl.text;
-        _apellidoCtrl.text = rp.apellido ?? _apellidoCtrl.text;
         _ubicacionCtrl.text = rp.ubicacionBase ?? _ubicacionCtrl.text;
         _ciudadSeleccionada = rp.ubicacionBase ?? _ciudadSeleccionada;
         if (_ciudadSeleccionada != null && !_ciudades.contains(_ciudadSeleccionada)) {
@@ -92,7 +98,15 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _guardando = true);
 
     final authState = context.read<AuthBloc>().state;
-    if (authState is! AuthAuthenticated) return;
+    if (authState is! AuthAuthenticated) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Inicia sesión para actualizar tu perfil')),
+        );
+      }
+      setState(() => _guardando = false);
+      return;
+    }
     final userId = authState.usuario.id;
 
     // Si no hay coordenadas base, intenta usar ubicación actual
@@ -106,8 +120,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final perfil = UserProfile(
       userId: userId,
-      nombre: _nombreCtrl.text.trim(),
-      apellido: _apellidoCtrl.text.trim(),
+      nombre: _toTitleCase(_nombreCtrl.text.trim()),
+      apellido: null,
       ubicacionBase: _ciudadSeleccionada,
       baseLat: _baseLat,
       baseLon: _baseLon,
@@ -186,11 +200,6 @@ class _ProfilePageState extends State<ProfilePage> {
                                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                               ),
                               const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _apellidoCtrl,
-                                decoration: const InputDecoration(labelText: 'Apellido', prefixIcon: Icon(Icons.person_outline)),
-                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-                              ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
                                 value: _ciudadSeleccionada,

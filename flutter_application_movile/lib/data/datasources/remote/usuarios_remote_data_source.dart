@@ -26,7 +26,6 @@ class UsuariosRemoteDataSource {
     await _supabase.from('usuarios').upsert({
       'id': perfil.userId,
       'nombre': perfil.nombre,
-      'apellido': perfil.apellido,
       'ubicacion_base': perfil.ubicacionBase,
       'base_lat': perfil.baseLat,
       'base_lon': perfil.baseLon,

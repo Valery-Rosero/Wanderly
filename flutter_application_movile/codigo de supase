@@ -1,0 +1,375 @@
+-- ============================================================
+-- Schema migration & setup for Wanderly (safe, non-destructive)
+-- - Adds extensions, tables, columns, RLS policies, indexes,
+--   functions and triggers. Does not drop existing tables.
+-- ============================================================
+
+-- 1) Extensions
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+-- ============================================================
+-- 2) USERS table: create if not exists, otherwise alter safely
+-- ============================================================
+
+-- Create table if it does not exist (linked to auth.users)
+CREATE TABLE IF NOT EXISTS public.usuarios (
+  id UUID PRIMARY KEY,
+  email TEXT,
+  nombre TEXT,
+  foto_perfil TEXT,
+  ciudad TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- If column creado_en exists (legacy), rename it to created_at
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'creado_en'
+  ) THEN
+    -- only rename if created_at doesn't already exist
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'created_at'
+    ) THEN
+      ALTER TABLE public.usuarios RENAME COLUMN creado_en TO created_at;
+    END IF;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add missing columns if table pre-exists and they aren't present
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'foto_perfil'
+  ) THEN
+    ALTER TABLE public.usuarios ADD COLUMN foto_perfil TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'ciudad'
+  ) THEN
+    ALTER TABLE public.usuarios ADD COLUMN ciudad TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'created_at'
+  ) THEN
+    ALTER TABLE public.usuarios ADD COLUMN created_at TIMESTAMPTZ DEFAULT now();
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Ensure unique index on email (if desired)
+CREATE UNIQUE INDEX IF NOT EXISTS usuarios_email_uidx ON public.usuarios (email);
+
+-- Enable Row Level Security on usuarios
+ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
+
+-- Policies for usuarios (drop then create to ensure expected state)
+DROP POLICY IF EXISTS "usuarios_select_own" ON public.usuarios;
+DROP POLICY IF EXISTS "usuarios_insert_own" ON public.usuarios;
+DROP POLICY IF EXISTS "usuarios_update_own" ON public.usuarios;
+DROP POLICY IF EXISTS "usuarios_delete_own" ON public.usuarios;
+
+CREATE POLICY "usuarios_select_own"
+  ON public.usuarios
+  FOR SELECT
+  USING (auth.uid() = id);
+
+CREATE POLICY "usuarios_insert_own"
+  ON public.usuarios
+  FOR INSERT
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "usuarios_update_own"
+  ON public.usuarios
+  FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "usuarios_delete_own"
+  ON public.usuarios
+  FOR DELETE
+  USING (auth.uid() = id);
+
+-- ============================================================
+-- 3) Trigger to create profile on auth.users insert (if missing)
+--    Keep or recreate handle_new_user trigger (idempotent)
+-- ============================================================
+
+-- Create or replace the helper function
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Only insert if a profile doesn't already exist
+  IF NOT EXISTS (SELECT 1 FROM public.usuarios WHERE id = NEW.id) THEN
+    INSERT INTO public.usuarios (id, email, created_at)
+    VALUES (NEW.id, NEW.email, now());
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger on auth.users if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    WHERE t.tgname = 'on_auth_user_created'
+      AND c.relname = 'users' AND t.tgconstraint = 0 -- non-constraint triggers
+  ) THEN
+    DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+    CREATE TRIGGER on_auth_user_created
+      AFTER INSERT ON auth.users
+      FOR EACH ROW
+      EXECUTE FUNCTION public.handle_new_user();
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================
+-- 4) lugares_favoritos: create if not exists (geography point)
+--    If you already have a table with different schema, we leave it intact.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.lugares_favoritos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id UUID NOT NULL
+    REFERENCES public.usuarios (id) ON DELETE CASCADE,
+  nombre_lugar TEXT NOT NULL,
+  direccion TEXT,
+  coordenadas GEOGRAPHY(POINT, 4326) NOT NULL,
+  tipo_lugar TEXT,
+  notas TEXT,
+  rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+  visitado BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Indexes for lugares_favoritos
+CREATE INDEX IF NOT EXISTS idx_lugares_favoritos_usuario_id ON public.lugares_favoritos (usuario_id);
+CREATE INDEX IF NOT EXISTS idx_lugares_favoritos_tipo ON public.lugares_favoritos (tipo_lugar);
+CREATE INDEX IF NOT EXISTS idx_lugares_favoritos_ubicacion ON public.lugares_favoritos USING GIST (coordenadas);
+CREATE INDEX IF NOT EXISTS idx_lugares_favoritos_visitado ON public.lugares_favoritos (visitado);
+
+-- Enable RLS and policies for favoritos (drop existing policies first)
+ALTER TABLE public.lugares_favoritos ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "fav_select_own" ON public.lugares_favoritos;
+DROP POLICY IF EXISTS "fav_insert_own" ON public.lugares_favoritos;
+DROP POLICY IF EXISTS "fav_update_own" ON public.lugares_favoritos;
+DROP POLICY IF EXISTS "fav_delete_own" ON public.lugares_favoritos;
+
+CREATE POLICY "fav_select_own"
+  ON public.lugares_favoritos
+  FOR SELECT
+  USING (auth.uid() = usuario_id);
+
+CREATE POLICY "fav_insert_own"
+  ON public.lugares_favoritos
+  FOR INSERT
+  WITH CHECK (auth.uid() = usuario_id);
+
+CREATE POLICY "fav_update_own"
+  ON public.lugares_favoritos
+  FOR UPDATE
+  USING (auth.uid() = usuario_id)
+  WITH CHECK (auth.uid() = usuario_id);
+
+CREATE POLICY "fav_delete_own"
+  ON public.lugares_favoritos
+  FOR DELETE
+  USING (auth.uid() = usuario_id);
+
+-- ============================================================
+-- 5) historial_chat: create if not exists
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.historial_chat (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id UUID REFERENCES public.usuarios(id) ON DELETE CASCADE NOT NULL,
+  mensaje TEXT NOT NULL,
+  es_usuario BOOLEAN NOT NULL DEFAULT TRUE,
+  tipo_consulta TEXT,
+  ubicacion_consulta GEOGRAPHY(POINT, 4326),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_historial_chat_usuario_id ON public.historial_chat (usuario_id);
+CREATE INDEX IF NOT EXISTS idx_historial_chat_fecha ON public.historial_chat (created_at);
+CREATE INDEX IF NOT EXISTS idx_historial_chat_tipo ON public.historial_chat (tipo_consulta);
+
+ALTER TABLE public.historial_chat ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "hist_select_own" ON public.historial_chat;
+DROP POLICY IF EXISTS "hist_insert_own" ON public.historial_chat;
+
+CREATE POLICY "hist_select_own"
+  ON public.historial_chat
+  FOR SELECT
+  USING (auth.uid() = usuario_id);
+
+CREATE POLICY "hist_insert_own"
+  ON public.historial_chat
+  FOR INSERT
+  WITH CHECK (auth.uid() = usuario_id);
+
+-- ============================================================
+-- 6) categorias_lugares: create if not exists and seed defaults
+--    This table is public read (categories)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.categorias_lugares (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre TEXT UNIQUE NOT NULL,
+  icono TEXT,
+  descripcion TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.categorias_lugares ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "todos_pueden_ver_categorias" ON public.categorias_lugares;
+CREATE POLICY "todos_pueden_ver_categorias" ON public.categorias_lugares
+  FOR SELECT USING (true);
+
+-- Seed categories (safe: ON CONFLICT DO NOTHING)
+INSERT INTO public.categorias_lugares (nombre, icono, descripcion) VALUES
+  ('restaurante', '🍽️', 'Lugares para comer'),
+  ('cafeteria', '☕', 'Cafés y pastelerías'),
+  ('bar', '🍻', 'Bares y pubs'),
+  ('museo', '🏛️', 'Museos y galerías'),
+  ('parque', '🌳', 'Parques y áreas verdes'),
+  ('centro_comercial', '🛍️', 'Centros comerciales'),
+  ('hotel', '🏨', 'Hoteles y alojamiento'),
+  ('playa', '🏖️', 'Playas y zonas costeras'),
+  ('mirador', '🌄', 'Miradores y vistas panorámicas'),
+  ('biblioteca', '📚', 'Bibliotecas y librerías'),
+  ('gimnasio', '💪', 'Gimnasios y centros deportivos'),
+  ('teatro', '🎭', 'Teatros y cines')
+ON CONFLICT (nombre) DO NOTHING;
+
+-- ============================================================
+-- 7) Function: obtener_lugares_cercanos (using geography & ST_DWithin)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.obtener_lugares_cercanos(
+  user_lat DOUBLE PRECISION,
+  user_lng DOUBLE PRECISION,
+  radio_km INTEGER DEFAULT 10,
+  filtro_tipo TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+  lugar_id UUID,
+  nombre_lugar TEXT,
+  direccion_lugar TEXT,
+  tipo_lugar TEXT,
+  distancia_km DOUBLE PRECISION
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    lf.id,
+    lf.nombre_lugar,
+    lf.direccion,
+    lf.tipo_lugar,
+    ST_Distance(
+      lf.coordenadas::geography,
+      ST_SetSRID(ST_MakePoint(user_lng, user_lat), 4326)::geography
+    ) / 1000 AS distancia_km
+  FROM public.lugares_favoritos lf
+  WHERE ST_DWithin(
+    lf.coordenadas::geography,
+    ST_SetSRID(ST_MakePoint(user_lng, user_lat), 4326)::geography,
+    radio_km * 1000
+  )
+  AND (filtro_tipo IS NULL OR lf.tipo_lugar = filtro_tipo)
+  ORDER BY distancia_km ASC;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- ============================================================
+-- 8) Trigger to set updated_at automatically
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach trigger to lugares_favoritos if not already present
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    WHERE t.tgname = 'actualizar_lugares_updated_at' AND c.relname = 'lugares_favoritos'
+  ) THEN
+    DROP TRIGGER IF EXISTS actualizar_lugares_updated_at ON public.lugares_favoritos;
+    CREATE TRIGGER actualizar_lugares_updated_at
+      BEFORE UPDATE ON public.lugares_favoritos
+      FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach a similar trigger for usuarios.updated_at if the column exists
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'updated_at'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_trigger t
+      JOIN pg_class c ON t.tgrelid = c.oid
+      WHERE t.tgname = 'set_updated_at_usuarios' AND c.relname = 'usuarios'
+    ) THEN
+      DROP TRIGGER IF EXISTS set_updated_at_usuarios ON public.usuarios;
+      CREATE TRIGGER set_updated_at_usuarios
+        BEFORE UPDATE ON public.usuarios
+        FOR EACH ROW
+        EXECUTE PROCEDURE public.set_updated_at();
+    END IF;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================================
+-- 9) Final notes: ensure constraints and hints for supabase
+-- ============================================================
+
+-- If you want the usuarios.id to reference auth.users (recommended), add FK:
+-- But only add if auth.users exists and usuarios.id is UUID (non-destructive check)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_class c WHERE c.relname = 'users' AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'auth'))
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='usuarios' AND column_name='id')
+  THEN
+    -- Add FK if not present
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+      WHERE rel.relname = 'usuarios' AND con.contype = 'f'
+    ) THEN
+      ALTER TABLE public.usuarios
+      ADD CONSTRAINT fk_usuarios_auth_users FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Done: your schema should now be in a consistent state.
+-- ============================================================
