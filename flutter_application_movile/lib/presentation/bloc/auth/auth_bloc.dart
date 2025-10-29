@@ -1,4 +1,5 @@
 import 'package:bloc/bloc.dart';
+import 'dart:async';
 import 'package:equatable/equatable.dart';  
 import 'package:flutter_application_movile/domain/entities/usuario_entity.dart';
 import 'package:flutter_application_movile/domain/repositories/auth_repository.dart';
@@ -96,18 +97,41 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         password: event.password,
         nombre: event.nombre,
       );
-      
-      // Después del registro, iniciar sesión automáticamente
-      await authRepository.signInWithEmail(
-        email: event.email,
-        password: event.password,
-      );
-      
-      final usuario = await authRepository.getUsuarioActual();
-      if (usuario != null) {
-        emit(AuthAuthenticated(usuario));
-      } else {
-        emit(const AuthError('Error al obtener datos del usuario'));
+      // Intentar iniciar sesión automáticamente tras registro exitoso
+      try {
+        await authRepository.signInWithEmail(
+          email: event.email,
+          password: event.password,
+        );
+
+        // Wait for Supabase session to become available via auth state stream
+        UsuarioEntity? usuarioStream;
+        try {
+          usuarioStream = await authRepository.currentUser
+              .firstWhere((u) => u != null)
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        } catch (_) {
+          usuarioStream = null;
+        }
+
+        // Fallback: poll getUsuarioActual briefly if stream is delayed
+        UsuarioEntity? usuario = usuarioStream;
+        if (usuario == null) {
+          for (int i = 0; i < 3 && usuario == null; i++) {
+            await Future.delayed(const Duration(milliseconds: 300));
+            usuario = await authRepository.getUsuarioActual();
+          }
+        }
+
+        if (usuario != null) {
+          emit(AuthAuthenticated(usuario));
+        } else {
+          emit(const AuthError('Failed to initialize user session after signup'));
+        }
+      } catch (e) {
+        // Si el proveedor requiere confirmación de email, mostrar mensaje claro
+        final msg = e.toString().replaceAll('Exception: ', '');
+        emit(AuthError(msg.isEmpty ? 'Error signing in after registration' : msg));
       }
     } catch (e) {
       emit(AuthError(e.toString().replaceAll('Exception: ', '')));
@@ -125,14 +149,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         password: event.password,
       );
       
-      // Pequeña pausa para asegurar que la sesión se establezca
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      final usuario = await authRepository.getUsuarioActual();
+      // Ensure the session is established and user is available
+      UsuarioEntity? usuario;
+      try {
+        usuario = await authRepository.currentUser
+            .firstWhere((u) => u != null)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+      } catch (_) {
+        usuario = null;
+      }
+
+      usuario ??= await authRepository.getUsuarioActual();
+
       if (usuario != null) {
         emit(AuthAuthenticated(usuario));
       } else {
-        emit(const AuthError('No se pudieron obtener los datos del usuario'));
+        emit(const AuthError('Failed to obtain user data'));
       }
     } catch (e) {
       // Limpiar el mensaje de error removiendo 'Exception: '

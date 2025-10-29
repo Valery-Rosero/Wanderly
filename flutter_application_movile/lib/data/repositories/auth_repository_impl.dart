@@ -42,18 +42,19 @@ class AuthRepositoryImpl implements AuthRepository {
         });
       }
     } on AuthException catch (e) {
-      // Manejo específico de errores de autenticación
-      if (e.message.contains('Invalid login credentials')) {
-        throw Exception('Credenciales inválidas');
-      } else if (e.message.contains('Email not confirmed')) {
-        throw Exception('Email no confirmado');
-      } else if (e.message.contains('User already registered')) {
-        throw Exception('Usuario ya registrado');
+      // Specific auth error handling with clear, user-friendly messages
+      final msg = e.message ?? '';
+      if (msg.contains('User already registered') || msg.contains('already registered')) {
+        throw Exception('This email is already in use. Please log in instead.');
+      } else if (msg.contains('Email not confirmed')) {
+        throw Exception('Please confirm your email to complete registration.');
+      } else if (msg.contains('Invalid email')) {
+        throw Exception('Please enter a valid email address.');
       } else {
-        throw Exception('Error de autenticación: ${e.message}');
+        throw Exception('Authentication error: ${e.message}');
       }
     } catch (e) {
-      throw Exception('Error en registro: $e');
+      throw Exception('Registration error: $e');
     }
   }
 
@@ -73,18 +74,19 @@ class AuthRepositoryImpl implements AuthRepository {
         throw Exception('No se pudo crear la sesión');
       }
     } on AuthException catch (e) {
-      // Manejo específico de errores de login
-      if (e.message.contains('Invalid login credentials')) {
-        throw Exception('Correo o contraseña incorrectos');
-      } else if (e.message.contains('Email not confirmed')) {
-        throw Exception('Por favor confirma tu email antes de iniciar sesión');
-      } else if (e.message.contains('Invalid email')) {
-        throw Exception('Formato de email inválido');
+      // Specific login error handling
+      final msg = e.message ?? '';
+      if (msg.contains('Invalid login credentials')) {
+        throw Exception('Incorrect email or password.');
+      } else if (msg.contains('Email not confirmed')) {
+        throw Exception('Please confirm your email before logging in.');
+      } else if (msg.contains('Invalid email')) {
+        throw Exception('Please enter a valid email address.');
       } else {
-        throw Exception('Error de autenticación: ${e.message}');
+        throw Exception('Authentication error: ${e.message}');
       }
     } catch (e) {
-      throw Exception('Error en inicio de sesión: $e');
+      throw Exception('Sign-in error: $e');
     }
   }
 

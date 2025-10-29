@@ -1,59 +1,365 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
+import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
 
-class MensajeChatWidget extends StatelessWidget {
+class MensajeChatWidget extends StatefulWidget {
   final MensajeChatEntity mensaje;
+  final Function(LugarEntity)? onPlaceTap;
+  final List<LugarEntity>? lugares;
 
-  const MensajeChatWidget({super.key, required this.mensaje});
+  const MensajeChatWidget({
+    super.key, 
+    required this.mensaje,
+    this.onPlaceTap,
+    this.lugares,
+  });
+
+  @override
+  State<MensajeChatWidget> createState() => _MensajeChatWidgetState();
+}
+
+class _MensajeChatWidgetState extends State<MensajeChatWidget> {
+  // Track recently-saved places to show a transient animated check
+  final Set<String> _recentlySaved = <String>{};
 
   @override
   Widget build(BuildContext context) {
+    final isUser = widget.mensaje.esUsuario;
+    final bubbleColor = isUser ? Colors.white : Theme.of(context).colorScheme.primary.withOpacity(0.10);
+    final labelColor = isUser ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.primary;
+
+    final bubble = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 600),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: BorderRadius.circular(16),
+          border: isUser ? Border.all(color: Colors.grey.shade200) : Border.all(color: Colors.deepPurple.shade100),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.mensaje.tipoLugar != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: labelColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  widget.mensaje.tipoLugar!,
+                  style: TextStyle(
+                    color: labelColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Text(
+              widget.mensaje.contenido,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            
+            // Enhanced place recommendations with tap-to-center functionality
+            if (!isUser && widget.lugares != null && widget.lugares!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              Text(
+                'Lugares recomendados:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: labelColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...widget.lugares!.asMap().entries.map((entry) {
+                final index = entry.key;
+                final lugar = entry.value;
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => widget.onPlaceTap?.call(lugar),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade200),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.02),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                // Place number badge
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.deepPurple.shade400,
+                                        Colors.purple.shade600,
+                                      ],
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                
+                                // Place icon
+                                Icon(
+                                  _getPlaceIcon(lugar.tipoLugar),
+                                  color: Colors.deepPurple.shade600,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                
+                                // Place details
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        lugar.nombre,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (lugar.direccion.isNotEmpty)
+                                        Text(
+                                          lugar.direccion,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                // Actions: center on map and save favorite
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Ver en mapa',
+                                      icon: Icon(
+                                        Icons.location_on,
+                                        color: Colors.deepPurple.shade400,
+                                      ),
+                                      onPressed: () => widget.onPlaceTap?.call(lugar),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Guardar favorito',
+                                      icon: AnimatedSwitcher(
+                                        duration: const Duration(milliseconds: 200),
+                                        child: _recentlySaved.contains(lugar.id)
+                                            ? const Icon(Icons.favorite, key: ValueKey('fav'), color: Colors.pinkAccent)
+                                            : const Icon(Icons.favorite_border, key: ValueKey('unfav'), color: Colors.pinkAccent),
+                                      ),
+                                      onPressed: () {
+                                        final bloc = context.read<ChatBloc>();
+                                        bloc.add(GuardarLugarFavoritoEvent(lugar));
+                                        // Show animated check overlay
+                                        setState(() {
+                                          _recentlySaved.add(lugar.id);
+                                        });
+                                        Future.delayed(const Duration(milliseconds: 1200), () {
+                                          if (!mounted) return;
+                                          setState(() {
+                                            _recentlySaved.remove(lugar.id);
+                                          });
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Animated check overlay in the top-right corner
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 250),
+                              opacity: _recentlySaved.contains(lugar.id) ? 1 : 0,
+                              child: AnimatedScale(
+                                scale: _recentlySaved.contains(lugar.id) ? 1 : 0.8,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOutBack,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade600,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.green.shade200,
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Center(
+                                    child: Icon(Icons.check, color: Colors.white, size: 16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              
+              // Helpful hint
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.touch_app,
+                      size: 12,
+                      color: Colors.blue.shade600,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Toca un lugar para verlo en el mapa',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.blue.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    final avatar = CircleAvatar(
+      backgroundColor: isUser ? Colors.grey.shade300 : Theme.of(context).colorScheme.primary,
+      child: Icon(isUser ? Icons.person : Icons.smart_toy, color: isUser ? Colors.white : Colors.white),
+    );
+
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!mensaje.esUsuario)
-            CircleAvatar(
-              backgroundColor: Colors.blue,
-              child: Icon(Icons.smart_toy, color: Colors.white),
-            )
-          else
-            CircleAvatar(
-              backgroundColor: Colors.green,
-              child: Icon(Icons.person, color: Colors.white),
-            ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  mensaje.esUsuario ? 'Tú' : 'TravelBot',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: mensaje.esUsuario ? Colors.green : Colors.blue,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: mensaje.esUsuario
-                        ? Colors.green.shade50
-                        : Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    mensaje.contenido,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
+        children: isUser
+            ? [
+                Expanded(child: Align(alignment: Alignment.centerRight, child: bubble)),
+                const SizedBox(width: 12),
+                avatar,
+              ]
+            : [
+                avatar,
+                const SizedBox(width: 12),
+                Expanded(child: bubble),
               ],
-            ),
-          ),
-        ],
       ),
     );
+  }
+
+  // Helper method to get appropriate icon for place type
+  IconData _getPlaceIcon(String? tipo) {
+    if (tipo == null) return Icons.place;
+    
+    switch (tipo.toLowerCase()) {
+      case 'restaurant':
+      case 'restaurante':
+      case 'food':
+      case 'comida':
+        return Icons.restaurant;
+      case 'hotel':
+      case 'lodging':
+      case 'hospedaje':
+        return Icons.hotel;
+      case 'tourist_attraction':
+      case 'attraction':
+      case 'atraccion':
+      case 'turismo':
+        return Icons.camera_alt;
+      case 'shopping_mall':
+      case 'store':
+      case 'tienda':
+      case 'compras':
+        return Icons.shopping_bag;
+      case 'hospital':
+      case 'health':
+      case 'salud':
+        return Icons.local_hospital;
+      case 'gas_station':
+      case 'gasolina':
+        return Icons.local_gas_station;
+      case 'bank':
+      case 'atm':
+      case 'banco':
+        return Icons.account_balance;
+      case 'park':
+      case 'parque':
+        return Icons.nature;
+      case 'museum':
+      case 'museo':
+        return Icons.museum;
+      case 'church':
+      case 'iglesia':
+        return Icons.church;
+      default:
+        return Icons.place;
+    }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart'; 
+import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
@@ -17,11 +18,12 @@ class ChatLoading extends ChatState {}
 
 class ChatLoaded extends ChatState {
   final List<MensajeChatEntity> mensajes;
+  final List<LugarEntity> lugares;
 
-  const ChatLoaded(this.mensajes);
+  const ChatLoaded(this.mensajes, {this.lugares = const []});
 
   @override
-  List<Object> get props => [mensajes];
+  List<Object> get props => [mensajes, lugares];
 }
 
 class ChatError extends ChatState {
@@ -69,6 +71,7 @@ class GuardarLugarFavoritoEvent extends ChatEvent {
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ChatRepository _chatRepository;
   final List<MensajeChatEntity> _mensajes = [];
+  List<LugarEntity> _lugares = [];
 
   ChatBloc({required ChatRepository chatRepository})
       : _chatRepository = chatRepository,
@@ -88,7 +91,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       esUsuario: true,
       timestamp: DateTime.now(),
     ));
-    emit(ChatLoaded(List.from(_mensajes)));
+    emit(ChatLoaded(List.from(_mensajes), lugares: List.from(_lugares)));
 
     try {
       // Obtener respuesta de Gemini
@@ -98,14 +101,16 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         longitud: event.longitud,
       );
 
-      // Agregar respuesta del chatbot
+      // Agregar respuesta del chatbot (texto)
       _mensajes.add(MensajeChatEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         contenido: respuesta,
         esUsuario: false,
         timestamp: DateTime.now(),
       ));
-      emit(ChatLoaded(List.from(_mensajes)));
+      // Intentar extraer lugares del sufijo JSON_PLACES
+      _lugares = _parsePlacesFromResponse(respuesta);
+      emit(ChatLoaded(List.from(_mensajes), lugares: List.from(_lugares)));
     } catch (e) {
       _mensajes.add(MensajeChatEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -113,7 +118,36 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         esUsuario: false,
         timestamp: DateTime.now(),
       ));
-      emit(ChatLoaded(List.from(_mensajes)));
+      emit(ChatLoaded(List.from(_mensajes), lugares: List.from(_lugares)));
+  }
+  }
+
+  List<LugarEntity> _parsePlacesFromResponse(String respuesta) {
+    try {
+      const marker = 'JSON_PLACES:';
+      final idx = respuesta.lastIndexOf(marker);
+      if (idx == -1) return [];
+      final jsonLine = respuesta.substring(idx + marker.length).trim();
+      final decoded = jsonDecode(jsonLine) as Map<String, dynamic>;
+      final places = decoded['places'] as List<dynamic>?;
+      if (places == null) return [];
+      return places.map((p) {
+        final name = p['name']?.toString() ?? 'Lugar';
+        final lat = (p['lat'] is num) ? (p['lat'] as num).toDouble() : double.tryParse('${p['lat']}') ?? 0.0;
+        final lng = (p['lng'] is num) ? (p['lng'] as num).toDouble() : double.tryParse('${p['lng']}') ?? 0.0;
+        final address = p['address']?.toString() ?? '';
+        final type = p['type']?.toString() ?? 'sitio';
+        return LugarEntity(
+          id: '${DateTime.now().millisecondsSinceEpoch}-${name}',
+          nombre: name,
+          direccion: address,
+          latitud: lat,
+          longitud: lng,
+          tipoLugar: type,
+        );
+      }).toList();
+    } catch (_) {
+      return [];
     }
   }
 

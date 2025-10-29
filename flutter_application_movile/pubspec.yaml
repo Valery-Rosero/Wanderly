@@ -26,6 +26,7 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   path_provider: ^2.1.3
+  sqflite: ^2.3.0
 
   # 🧠 Estado e inyección de dependencias
   flutter_bloc: ^9.1.1
@@ -39,6 +40,8 @@ dependencies:
   url_launcher: ^6.2.0
   cupertino_icons: ^1.0.8
   bloc: ^9.1.0
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:
