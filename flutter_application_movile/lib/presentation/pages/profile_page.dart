@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_application_movile/data/datasources/local/profile_local_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/usuarios_remote_data_source.dart';
+import 'package:flutter_application_movile/data/constants/colombia_cities.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -23,10 +24,13 @@ class _ProfilePageState extends State<ProfilePage> {
   double? _baseLon;
   bool _cargando = true;
   bool _guardando = false;
+  late List<String> _ciudades;
+  String? _ciudadSeleccionada;
 
   @override
   void initState() {
     super.initState();
+    _ciudades = List<String>.from(colombiaCities);
     _cargarPerfil();
   }
 
@@ -49,6 +53,13 @@ class _ProfilePageState extends State<ProfilePage> {
           _nombreCtrl.text = lp.nombre ?? '';
           _apellidoCtrl.text = lp.apellido ?? '';
           _ubicacionCtrl.text = lp.ubicacionBase ?? '';
+          _ciudadSeleccionada = lp.ubicacionBase;
+          if (_ciudadSeleccionada != null && !_ciudades.contains(_ciudadSeleccionada)) {
+            _ciudades = [
+              _ciudadSeleccionada!,
+              ..._ciudades,
+            ];
+          }
           _baseLat = lp.baseLat;
           _baseLon = lp.baseLon;
         }
@@ -59,6 +70,13 @@ class _ProfilePageState extends State<ProfilePage> {
         _nombreCtrl.text = rp.nombre ?? _nombreCtrl.text;
         _apellidoCtrl.text = rp.apellido ?? _apellidoCtrl.text;
         _ubicacionCtrl.text = rp.ubicacionBase ?? _ubicacionCtrl.text;
+        _ciudadSeleccionada = rp.ubicacionBase ?? _ciudadSeleccionada;
+        if (_ciudadSeleccionada != null && !_ciudades.contains(_ciudadSeleccionada)) {
+          _ciudades = [
+            _ciudadSeleccionada!,
+            ..._ciudades,
+          ];
+        }
         _baseLat = rp.baseLat ?? _baseLat;
         _baseLon = rp.baseLon ?? _baseLon;
         if (local != null) {
@@ -90,7 +108,7 @@ class _ProfilePageState extends State<ProfilePage> {
       userId: userId,
       nombre: _nombreCtrl.text.trim(),
       apellido: _apellidoCtrl.text.trim(),
-      ubicacionBase: _ubicacionCtrl.text.trim(),
+      ubicacionBase: _ciudadSeleccionada,
       baseLat: _baseLat,
       baseLon: _baseLon,
     );
@@ -174,10 +192,20 @@ class _ProfilePageState extends State<ProfilePage> {
                                 validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                               ),
                               const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _ubicacionCtrl,
-                                decoration: const InputDecoration(labelText: 'Ubicación base (ciudad/dirección)', prefixIcon: Icon(Icons.location_city)),
-                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                              DropdownButtonFormField<String>(
+                                value: _ciudadSeleccionada,
+                                items: _ciudades
+                                    .map((c) => DropdownMenuItem<String>(
+                                          value: c,
+                                          child: Text(c),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) => setState(() => _ciudadSeleccionada = v),
+                                decoration: const InputDecoration(
+                                  labelText: 'Ciudad de origen',
+                                  prefixIcon: Icon(Icons.location_city),
+                                ),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
                               ),
                               const SizedBox(height: 24),
                               SizedBox(
