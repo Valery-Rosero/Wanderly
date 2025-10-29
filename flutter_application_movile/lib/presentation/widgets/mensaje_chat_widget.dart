@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
 
-class MensajeChatWidget extends StatelessWidget {
+class MensajeChatWidget extends StatefulWidget {
   final MensajeChatEntity mensaje;
   final Function(LugarEntity)? onPlaceTap;
   final List<LugarEntity>? lugares;
@@ -15,8 +17,16 @@ class MensajeChatWidget extends StatelessWidget {
   });
 
   @override
+  State<MensajeChatWidget> createState() => _MensajeChatWidgetState();
+}
+
+class _MensajeChatWidgetState extends State<MensajeChatWidget> {
+  // Track recently-saved places to show a transient animated check
+  final Set<String> _recentlySaved = <String>{};
+
+  @override
   Widget build(BuildContext context) {
-    final isUser = mensaje.esUsuario;
+    final isUser = widget.mensaje.esUsuario;
     final bubbleColor = isUser ? Colors.white : Theme.of(context).colorScheme.primary.withOpacity(0.10);
     final labelColor = isUser ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.primary;
 
@@ -27,7 +37,7 @@ class MensajeChatWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: BorderRadius.circular(16),
-          border: isUser ? Border.all(color: Colors.grey.shade200) : null,
+          border: isUser ? Border.all(color: Colors.grey.shade200) : Border.all(color: Colors.deepPurple.shade100),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -39,7 +49,7 @@ class MensajeChatWidget extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (mensaje.tipoLugar != null) ...[
+            if (widget.mensaje.tipoLugar != null) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
@@ -47,7 +57,7 @@ class MensajeChatWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  mensaje.tipoLugar!,
+                  widget.mensaje.tipoLugar!,
                   style: TextStyle(
                     color: labelColor,
                     fontSize: 12,
@@ -58,12 +68,12 @@ class MensajeChatWidget extends StatelessWidget {
               const SizedBox(height: 8),
             ],
             Text(
-              mensaje.contenido,
+              widget.mensaje.contenido,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             
             // Enhanced place recommendations with tap-to-center functionality
-            if (!isUser && lugares != null && lugares!.isNotEmpty) ...[
+            if (!isUser && widget.lugares != null && widget.lugares!.isNotEmpty) ...[
               const SizedBox(height: 12),
               const Divider(height: 1),
               const SizedBox(height: 8),
@@ -76,7 +86,7 @@ class MensajeChatWidget extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              ...lugares!.asMap().entries.map((entry) {
+              ...widget.lugares!.asMap().entries.map((entry) {
                 final index = entry.key;
                 final lugar = entry.value;
                 
@@ -85,94 +95,161 @@ class MensajeChatWidget extends StatelessWidget {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => onPlaceTap?.call(lugar),
+                      onTap: () => widget.onPlaceTap?.call(lugar),
                       borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade200),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                      child: Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade200),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.02),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            // Place number badge
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.deepPurple.shade400,
-                                    Colors.purple.shade600,
+                            child: Row(
+                              children: [
+                                // Place number badge
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.deepPurple.shade400,
+                                        Colors.purple.shade600,
+                                      ],
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${index + 1}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                
+                                // Place icon
+                                Icon(
+                                  _getPlaceIcon(lugar.tipoLugar),
+                                  color: Colors.deepPurple.shade600,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                
+                                // Place details
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        lugar.nombre,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (lugar.direccion.isNotEmpty)
+                                        Text(
+                                          lugar.direccion,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                // Actions: center on map and save favorite
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Ver en mapa',
+                                      icon: Icon(
+                                        Icons.location_on,
+                                        color: Colors.deepPurple.shade400,
+                                      ),
+                                      onPressed: () => widget.onPlaceTap?.call(lugar),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Guardar favorito',
+                                      icon: AnimatedSwitcher(
+                                        duration: const Duration(milliseconds: 200),
+                                        child: _recentlySaved.contains(lugar.id)
+                                            ? const Icon(Icons.favorite, key: ValueKey('fav'), color: Colors.pinkAccent)
+                                            : const Icon(Icons.favorite_border, key: ValueKey('unfav'), color: Colors.pinkAccent),
+                                      ),
+                                      onPressed: () {
+                                        final bloc = context.read<ChatBloc>();
+                                        bloc.add(GuardarLugarFavoritoEvent(lugar));
+                                        // Show animated check overlay
+                                        setState(() {
+                                          _recentlySaved.add(lugar.id);
+                                        });
+                                        Future.delayed(const Duration(milliseconds: 1200), () {
+                                          if (!mounted) return;
+                                          setState(() {
+                                            _recentlySaved.remove(lugar.id);
+                                          });
+                                        });
+                                      },
+                                    ),
                                   ],
                                 ),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '${index + 1}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                              ],
+                            ),
+                          ),
+                          // Animated check overlay in the top-right corner
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: AnimatedOpacity(
+                              duration: const Duration(milliseconds: 250),
+                              opacity: _recentlySaved.contains(lugar.id) ? 1 : 0,
+                              child: AnimatedScale(
+                                scale: _recentlySaved.contains(lugar.id) ? 1 : 0.8,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOutBack,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade600,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.green.shade200,
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Center(
+                                    child: Icon(Icons.check, color: Colors.white, size: 16),
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            
-                            // Place icon
-                            Icon(
-                              _getPlaceIcon(lugar.tipoLugar),
-                              color: Colors.deepPurple.shade600,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            
-                            // Place details
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    lugar.nombre,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (lugar.direccion.isNotEmpty)
-                                    Text(
-                                      lugar.direccion,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            
-                            // Tap indicator
-                            Icon(
-                              Icons.location_on,
-                              color: Colors.grey.shade400,
-                              size: 16,
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -274,7 +351,7 @@ class MensajeChatWidget extends StatelessWidget {
         return Icons.account_balance;
       case 'park':
       case 'parque':
-        return Icons.park;
+        return Icons.nature;
       case 'museum':
       case 'museo':
         return Icons.museum;

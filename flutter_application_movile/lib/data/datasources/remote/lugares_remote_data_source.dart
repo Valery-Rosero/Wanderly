@@ -33,4 +33,15 @@ class LugaresRemoteDataSource {
 
     return response;
   }
+
+  Future<void> eliminarLugarFavorito({
+    required String usuarioId,
+    required String favoritoId,
+  }) async {
+    await _supabase
+        .from('lugares_favoritos')
+        .delete()
+        .eq('usuario_id', usuarioId)
+        .eq('id', favoritoId);
+  }
 }

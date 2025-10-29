@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -11,6 +12,7 @@ import 'package:flutter_application_movile/data/datasources/local/location_data_
 import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
 import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
@@ -18,6 +20,8 @@ import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart
 import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
 import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
 import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
+import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
+import 'package:flutter_application_movile/presentation/pages/favorites_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -47,18 +51,21 @@ class _HomePageState extends State<HomePage> {
     _obtenerUbicacion();
   }
 
-  void _inicializarChat() {
+  Future<void> _inicializarChat() async {
     try {
       print('🔧 Inicializando ChatBloc...');
       final authState = context.read<AuthBloc>().state;
       
       if (authState is AuthAuthenticated) {
         print('✅ Usuario autenticado: ${authState.usuario.id}');
+        // En web no inicializamos SQLite
+        final favoritesLocal = kIsWeb ? null : await FavoritesLocalDataSource.create();
         
         _chatBloc = ChatBloc(
           chatRepository: ChatRepositoryImpl(
             geminiDataSource: GeminiRemoteDataSource(),
             lugaresDataSource: LugaresRemoteDataSource(Supabase.instance.client),
+            favoritesLocal: favoritesLocal,
             usuarioId: authState.usuario.id,
           ),
         );
@@ -306,6 +313,26 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.person),
+              tooltip: 'Perfil',
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.favorite),
+              tooltip: 'Favoritos',
+              onPressed: () async {
+                final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage()));
+                if (result is Map && result['centerOn'] is Map) {
+                  final c = result['centerOn'] as Map;
+                  final lat = (c['lat'] as num).toDouble();
+                  final lon = (c['lon'] as num).toDouble();
+                  _mapController.move(latlng.LatLng(lat, lon), 16.0);
+                }
+              },
+            ),
             if (_ubicacionCargando)
               const Padding(
                 padding: EdgeInsets.all(8.0),
@@ -376,7 +403,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildBody() {
-    return Column(
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.white, Color(0xFFF3F4F6)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Column(
       children: [
         if (_errorUbicacion != null)
           Container(
@@ -559,7 +594,8 @@ class _HomePageState extends State<HomePage> {
           },
         ),
       ],
-    );
+    ),
+  );
   }
 
   Widget _buildMap(List<LugarEntity> lugares) {
@@ -689,8 +725,18 @@ class _HomePageState extends State<HomePage> {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
         child: SizedBox(
           height: 260,
           child: Stack(
@@ -725,22 +771,13 @@ class _HomePageState extends State<HomePage> {
                     userAgentPackageName: 'com.wanderly.app',
                     maxZoom: 19,
                     minZoom: 3,
-                    // Enhanced tile loading for better performance
-                    tileProvider: NetworkTileProvider(),
                     // Better error handling and fallback
                     errorTileCallback: (tile, error, stackTrace) {
                       print('🗺️ Error loading tile: $error');
                     },
-                    // Improved tile display settings
-                    tileDisplay: const TileDisplay.fadeIn(
-                      duration: Duration(milliseconds: 200),
-                    ),
                     // Better caching and performance
                     maxNativeZoom: 19,
                     zoomOffset: 0,
-                    additionalOptions: const {
-                      'attribution': '© OpenStreetMap contributors',
-                    },
                   ),
                   MarkerLayer(markers: markers),
                 ],
@@ -921,7 +958,7 @@ class _HomePageState extends State<HomePage> {
         return Icons.account_balance;
       case 'park':
       case 'parque':
-        return Icons.park;
+        return Icons.nature;
       case 'museum':
       case 'museo':
         return Icons.museum;
