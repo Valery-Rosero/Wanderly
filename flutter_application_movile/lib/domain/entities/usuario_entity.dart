@@ -4,7 +4,7 @@ class UsuarioEntity {
   final String? nombre;
   final String? fotoPerfil;
   final DateTime createdAt;
-
+//viva petro
   UsuarioEntity({
     required this.id,
     required this.email,

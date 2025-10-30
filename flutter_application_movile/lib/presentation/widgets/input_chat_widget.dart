@@ -19,7 +19,7 @@ class InputChatWidget extends StatefulWidget {
 
 class _InputChatWidgetState extends State<InputChatWidget> {
   final TextEditingController _controller = TextEditingController();
-
+//profe no nos regañe trae no sirve :(
   @override
   Widget build(BuildContext context) {
     return SafeArea(

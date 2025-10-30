@@ -49,7 +49,7 @@ class MyApp extends StatelessWidget {
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
-
+//hala madrid
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(

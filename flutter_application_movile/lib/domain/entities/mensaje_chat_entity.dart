@@ -3,7 +3,7 @@ class MensajeChatEntity {
   final String contenido;
   final bool esUsuario;
   final DateTime timestamp;
-  final String? tipoLugar; // 'cafeteria', 'museo', etc.
+  final String? tipoLugar; 
 
   MensajeChatEntity({
     required this.id,
