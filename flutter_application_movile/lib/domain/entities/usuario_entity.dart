@@ -1,14 +1,14 @@
-class UsuarioEntity {
+class UserEntity {
   final String id;
   final String email;
-  final String? nombre;
+  final String? name;
   final String? fotoPerfil;
   final DateTime createdAt;
 //viva petro
-  UsuarioEntity({
+  UserEntity({
     required this.id,
     required this.email,
-    this.nombre,
+    this.name,
     this.fotoPerfil,
     required this.createdAt,
   });

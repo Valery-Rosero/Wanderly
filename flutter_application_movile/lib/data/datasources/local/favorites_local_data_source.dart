@@ -13,18 +13,18 @@ class FavoritesLocalDataSource {
     return FavoritesLocalDataSource(db);
   }
 
-  Future<int> saveFavorite(String userId, LugarEntity lugar) async {
+  Future<int> saveFavorite(String userId, PlaceEntity place) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     return await _db.insert(
       'favorites',
       {
         'user_id': userId,
-        'remote_id': lugar.id,
-        'nombre': lugar.nombre,
-        'direccion': lugar.direccion,
-        'lat': lugar.latitud,
-        'lon': lugar.longitud,
-        'tipo': lugar.tipoLugar,
+        'remote_id': place.id,
+        'nombre': place.name,
+        'direccion': place.address,
+        'lat': place.latitude,
+        'lon': place.longitude,
+        'tipo': place.placeType,
         'created_at': now,
         'synced': 0,
       },
@@ -32,20 +32,20 @@ class FavoritesLocalDataSource {
     );
   }
 
-  Future<List<LugarEntity>> getFavorites(String userId) async {
+  Future<List<PlaceEntity>> getFavorites(String userId) async {
     final rows = await _db.query(
       'favorites',
       where: 'user_id = ?',
       whereArgs: [userId],
       orderBy: 'created_at DESC',
     );
-    return rows.map((r) => LugarEntity(
+    return rows.map((r) => PlaceEntity(
           id: (r['remote_id'] as String?) ?? 'local_${r['id']}',
-          nombre: r['nombre'] as String,
-          direccion: (r['direccion'] as String?) ?? '',
-          latitud: (r['lat'] as num).toDouble(),
-          longitud: (r['lon'] as num).toDouble(),
-          tipoLugar: (r['tipo'] as String?) ?? '',
+          name: r['nombre'] as String,
+          address: (r['direccion'] as String?) ?? '',
+          latitude: (r['lat'] as num).toDouble(),
+          longitude: (r['lon'] as num).toDouble(),
+          placeType: (r['tipo'] as String?) ?? '',
         )).toList();
   }
 
@@ -58,14 +58,14 @@ class FavoritesLocalDataSource {
     );
   }
 
-  Future<void> enqueueSyncFavorite(String userId, LugarEntity lugar) async {
+  Future<void> enqueueSyncFavorite(String userId, PlaceEntity place) async {
     final payload = jsonEncode({
       'usuario_id': userId,
-      'nombre_lugar': lugar.nombre,
-      'direccion': lugar.direccion,
-      'latitud': lugar.latitud,
-      'longitud': lugar.longitud,
-      'tipo_lugar': lugar.tipoLugar,
+      'nombre_lugar': place.name,
+      'direccion': place.address,
+      'latitud': place.latitude,
+      'longitud': place.longitude,
+      'tipo_lugar': place.placeType,
       'notas': 'Guardado desde chat',
     });
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -79,19 +79,19 @@ class FavoritesLocalDataSource {
     });
   }
 
-  Future<int> deleteFavorite(String userId, LugarEntity lugar) async {
+  Future<int> deleteFavorite(String userId, PlaceEntity place) async {
     // Try delete by remote_id if available, otherwise match by fields
-    if (lugar.id != null && !(lugar.id!.startsWith('local_'))) {
+    if (place.id != null && !(place.id!.startsWith('local_'))) {
       return await _db.delete(
         'favorites',
         where: 'user_id = ? AND remote_id = ?',
-        whereArgs: [userId, lugar.id],
+        whereArgs: [userId, place.id],
       );
     }
     return await _db.delete(
       'favorites',
       where: 'user_id = ? AND nombre = ? AND lat = ? AND lon = ?',
-      whereArgs: [userId, lugar.nombre, lugar.latitud, lugar.longitud],
+      whereArgs: [userId, place.name, place.latitude, place.longitude],
     );
   }
 

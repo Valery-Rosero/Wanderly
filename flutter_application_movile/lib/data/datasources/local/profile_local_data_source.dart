@@ -3,7 +3,7 @@ import 'package:flutter_application_movile/data/datasources/local/sqlite_databas
 
 class UserProfile {
   final String userId;
-  final String? nombre;
+  final String? name;
   final String? apellido;
   final String? ubicacionBase;
   final double? baseLat;
@@ -11,7 +11,7 @@ class UserProfile {
 
   UserProfile({
     required this.userId,
-    this.nombre,
+    this.name,
     this.apellido,
     this.ubicacionBase,
     this.baseLat,
@@ -34,7 +34,7 @@ class ProfileLocalDataSource {
     final r = rows.first;
     return UserProfile(
       userId: r['user_id'] as String,
-      nombre: r['nombre'] as String?,
+      name: r['nombre'] as String?,
       apellido: r['apellido'] as String?,
       ubicacionBase: r['ubicacion_base'] as String?,
       baseLat: (r['base_lat'] as num?)?.toDouble(),
@@ -48,7 +48,7 @@ class ProfileLocalDataSource {
       'user_profile',
       {
         'user_id': profile.userId,
-        'nombre': profile.nombre,
+        'nombre': profile.name,
         'apellido': profile.apellido,
         'ubicacion_base': profile.ubicacionBase,
         'base_lat': profile.baseLat,

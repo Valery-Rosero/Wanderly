@@ -16,12 +16,12 @@ class AuthInitial extends AuthState {}
 class AuthLoading extends AuthState {}
 
 class AuthAuthenticated extends AuthState {
-  final UsuarioEntity usuario;
+  final UserEntity user;
 
-  const AuthAuthenticated(this.usuario);
+  const AuthAuthenticated(this.user);
 
   @override
-  List<Object> get props => [usuario];
+  List<Object> get props => [user];
 }
 
 class AuthUnauthenticated extends AuthState {}
@@ -46,16 +46,16 @@ abstract class AuthEvent extends Equatable {
 class SignUpRequested extends AuthEvent {
   final String email;
   final String password;
-  final String nombre;
+  final String name;
 
   const SignUpRequested({
     required this.email,
     required this.password,
-    required this.nombre,
+    required this.name,
   });
 
   @override
-  List<Object> get props => [email, password, nombre];
+  List<Object> get props => [email, password, name];
 }
 
 class SignInRequested extends AuthEvent {
@@ -95,7 +95,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await authRepository.signUpWithEmail(
         email: event.email,
         password: event.password,
-        nombre: event.nombre,
+        name: event.name,
       );
       // Intentar iniciar sesión automáticamente tras registro exitoso
       try {
@@ -105,7 +105,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         );
 
         // Wait for Supabase session to become available via auth state stream
-        UsuarioEntity? usuarioStream;
+        UserEntity? usuarioStream;
         try {
           usuarioStream = await authRepository.currentUser
               .firstWhere((u) => u != null)
@@ -115,21 +115,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         }
 
         // Fallback: poll getUsuarioActual briefly if stream is delayed
-        UsuarioEntity? usuario = usuarioStream;
-        if (usuario == null) {
-          for (int i = 0; i < 3 && usuario == null; i++) {
+        UserEntity? user = usuarioStream;
+        if (user == null) {
+          for (int i = 0; i < 3 && user == null; i++) {
             await Future.delayed(const Duration(milliseconds: 300));
-            usuario = await authRepository.getUsuarioActual();
+            user = await authRepository.getUsuarioActual();
           }
         }
 
-        if (usuario != null) {
-          emit(AuthAuthenticated(usuario));
+        if (user != null) {
+          emit(AuthAuthenticated(user));
         } else {
           emit(const AuthError('Failed to initialize user session after signup'));
         }
       } catch (e) {
-        // Si el proveedor requiere confirmación de email, mostrar mensaje claro
+        // Si el proveedor requiere confirmación de email, mostrar message claro
         final msg = e.toString().replaceAll('Exception: ', '');
         emit(AuthError(msg.isEmpty ? 'Error signing in after registration' : msg));
       }
@@ -150,24 +150,24 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       
       // Ensure the session is established and user is available
-      UsuarioEntity? usuario;
+      UserEntity? user;
       try {
-        usuario = await authRepository.currentUser
+        user = await authRepository.currentUser
             .firstWhere((u) => u != null)
             .timeout(const Duration(seconds: 5), onTimeout: () => null);
       } catch (_) {
-        usuario = null;
+        user = null;
       }
 
-      usuario ??= await authRepository.getUsuarioActual();
+      user ??= await authRepository.getUsuarioActual();
 
-      if (usuario != null) {
-        emit(AuthAuthenticated(usuario));
+      if (user != null) {
+        emit(AuthAuthenticated(user));
       } else {
         emit(const AuthError('Failed to obtain user data'));
       }
     } catch (e) {
-      // Limpiar el mensaje de error removiendo 'Exception: '
+      // Limpiar el message de error removiendo 'Exception: '
       final errorMessage = e.toString().replaceAll('Exception: ', '');
       emit(AuthError(errorMessage));
     }
@@ -192,9 +192,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      final usuario = await authRepository.getUsuarioActual();
-      if (usuario != null) {
-        emit(AuthAuthenticated(usuario));
+      final user = await authRepository.getUsuarioActual();
+      if (user != null) {
+        emit(AuthAuthenticated(user));
       } else {
         emit(AuthUnauthenticated());
       }

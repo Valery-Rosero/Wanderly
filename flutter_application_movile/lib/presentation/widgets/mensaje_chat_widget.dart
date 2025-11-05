@@ -5,15 +5,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
 
 class MensajeChatWidget extends StatefulWidget {
-  final MensajeChatEntity mensaje;
-  final Function(LugarEntity)? onPlaceTap;
-  final List<LugarEntity>? lugares;
+  final ChatMessageEntity message;
+  final Function(PlaceEntity)? onPlaceTap;
+  final List<PlaceEntity>? places;
 
   const MensajeChatWidget({
     super.key, 
-    required this.mensaje,
+    required this.message,
     this.onPlaceTap,
-    this.lugares,
+    this.places,
   });
 
   @override
@@ -26,7 +26,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final isUser = widget.mensaje.esUsuario;
+    final isUser = widget.message.esUsuario;
     final bubbleColor = isUser ? Colors.white : Theme.of(context).colorScheme.primary.withOpacity(0.10);
     final labelColor = isUser ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.primary;
 
@@ -49,7 +49,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.mensaje.tipoLugar != null) ...[
+            if (widget.message.placeType != null) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
@@ -57,7 +57,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  widget.mensaje.tipoLugar!,
+                  widget.message.placeType!,
                   style: TextStyle(
                     color: labelColor,
                     fontSize: 12,
@@ -68,12 +68,12 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
               const SizedBox(height: 8),
             ],
             Text(
-              widget.mensaje.contenido,
+              widget.message.contenido,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             
             // Enhanced place recommendations with tap-to-center functionality
-            if (!isUser && widget.lugares != null && widget.lugares!.isNotEmpty) ...[
+            if (!isUser && widget.places != null && widget.places!.isNotEmpty) ...[
               const SizedBox(height: 12),
               const Divider(height: 1),
               const SizedBox(height: 8),
@@ -86,16 +86,16 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                 ),
               ),
               const SizedBox(height: 8),
-              ...widget.lugares!.asMap().entries.map((entry) {
+              ...widget.places!.asMap().entries.map((entry) {
                 final index = entry.key;
-                final lugar = entry.value;
+                final place = entry.value;
                 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 6),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => widget.onPlaceTap?.call(lugar),
+                      onTap: () => widget.onPlaceTap?.call(place),
                       borderRadius: BorderRadius.circular(8),
                       child: Stack(
                         children: [
@@ -143,7 +143,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                 
                                 // Place icon
                                 Icon(
-                                  _getPlaceIcon(lugar.tipoLugar),
+                                  _getPlaceIcon(place.placeType),
                                   color: Colors.deepPurple.shade600,
                                   size: 18,
                                 ),
@@ -155,7 +155,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        lugar.nombre,
+                                        place.name,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: 13,
@@ -163,9 +163,9 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      if (lugar.direccion.isNotEmpty)
+                                      if (place.address.isNotEmpty)
                                         Text(
-                                          lugar.direccion,
+                                          place.address,
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: Colors.grey.shade600,
@@ -187,27 +187,27 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                         Icons.location_on,
                                         color: Colors.deepPurple.shade400,
                                       ),
-                                      onPressed: () => widget.onPlaceTap?.call(lugar),
+                                      onPressed: () => widget.onPlaceTap?.call(place),
                                     ),
                                     IconButton(
                                       tooltip: 'Guardar favorito',
                                       icon: AnimatedSwitcher(
                                         duration: const Duration(milliseconds: 200),
-                                        child: _recentlySaved.contains(lugar.id)
+                                        child: _recentlySaved.contains(place.id)
                                             ? const Icon(Icons.favorite, key: ValueKey('fav'), color: Colors.pinkAccent)
                                             : const Icon(Icons.favorite_border, key: ValueKey('unfav'), color: Colors.pinkAccent),
                                       ),
                                       onPressed: () {
                                         final bloc = context.read<ChatBloc>();
-                                        bloc.add(GuardarLugarFavoritoEvent(lugar));
+                                        bloc.add(GuardarLugarFavoritoEvent(place));
                                         // Show animated check overlay
                                         setState(() {
-                                          _recentlySaved.add(lugar.id);
+                                          _recentlySaved.add(place.id);
                                         });
                                         Future.delayed(const Duration(milliseconds: 1200), () {
                                           if (!mounted) return;
                                           setState(() {
-                                            _recentlySaved.remove(lugar.id);
+                                            _recentlySaved.remove(place.id);
                                           });
                                         });
                                       },
@@ -223,9 +223,9 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                             top: 8,
                             child: AnimatedOpacity(
                               duration: const Duration(milliseconds: 250),
-                              opacity: _recentlySaved.contains(lugar.id) ? 1 : 0,
+                              opacity: _recentlySaved.contains(place.id) ? 1 : 0,
                               child: AnimatedScale(
-                                scale: _recentlySaved.contains(lugar.id) ? 1 : 0.8,
+                                scale: _recentlySaved.contains(place.id) ? 1 : 0.8,
                                 duration: const Duration(milliseconds: 250),
                                 curve: Curves.easeOutBack,
                                 child: Container(

@@ -18,7 +18,7 @@ class FavoritesPage extends StatefulWidget {
 
 class _FavoritesPageState extends State<FavoritesPage> {
   bool _cargando = true;
-  List<LugarEntity> _favoritos = [];
+  List<PlaceEntity> _favoritos = [];
   double? _baseLat, _baseLon;
 
   @override
@@ -30,9 +30,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
   Future<void> _cargar() async {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) { setState(() => _cargando = false); return; }
-    final userId = authState.usuario.id;
+    final userId = authState.user.id;
     final supabase = Supabase.instance.client;
-    final rem = LugaresRemoteDataSource(supabase);
+    final rem = PlacesRemoteDataSource(supabase);
     final favLocal = kIsWeb ? null : await FavoritesLocalDataSource.create();
     final profileLocal = kIsWeb ? null : await ProfileLocalDataSource.create();
 
@@ -48,16 +48,16 @@ class _FavoritesPageState extends State<FavoritesPage> {
         _favoritos = await favLocal.getFavorites(userId);
       } else {
         // Web: leer de Supabase
-        final data = await rem.obtenerLugaresFavoritos(userId);
+        final data = await rem.getFavoritePlaces(userId);
         _favoritos = data.map((json) {
           final coord = _parseCoordenadas(json['coordenadas']);
-          return LugarEntity(
+          return PlaceEntity(
             id: json['id'],
-            nombre: json['nombre_lugar'],
-            direccion: json['direccion'] ?? '',
-            latitud: coord.$1,
-            longitud: coord.$2,
-            tipoLugar: json['tipo_lugar'] ?? '',
+            name: json['nombre_lugar'],
+            address: json['direccion'] ?? '',
+            latitude: coord.$1,
+            longitude: coord.$2,
+            placeType: json['tipo_lugar'] ?? '',
           );
         }).toList();
       }
@@ -74,9 +74,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
     return (0.0, 0.0);
   }
 
-  double? _distanceToBase(LugarEntity l) {
+  double? _distanceToBase(PlaceEntity l) {
     if (_baseLat == null || _baseLon == null) return null;
-    return Geolocator.distanceBetween(_baseLat!, _baseLon!, l.latitud, l.longitud);
+    return Geolocator.distanceBetween(_baseLat!, _baseLon!, l.latitude, l.longitude);
   }
 
   @override
@@ -110,11 +110,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
                       ),
                       child: const Icon(Icons.favorite, color: Colors.white),
                     ),
-                    title: Text(l.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(l.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${l.tipoLugar} • ${l.direccion}'),
+                        Text('${l.placeType} • ${l.address}'),
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -133,7 +133,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                         IconButton(
                           icon: const Icon(Icons.map, color: Color(0xFF3B82F6)),
                           onPressed: () {
-                            Navigator.pop(context, {'centerOn': {'lat': l.latitud, 'lon': l.longitud}});
+                            Navigator.pop(context, {'centerOn': {'lat': l.latitude, 'lon': l.longitude}});
                           },
                         ),
                         IconButton(
@@ -141,9 +141,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
                           onPressed: () async {
                             final authState = context.read<AuthBloc>().state;
                             if (authState is! AuthAuthenticated) return;
-                            final userId = authState.usuario.id;
+                            final userId = authState.user.id;
                             final supabase = Supabase.instance.client;
-                            final rem = LugaresRemoteDataSource(supabase);
+                            final rem = PlacesRemoteDataSource(supabase);
                             final favLocal = kIsWeb ? null : await FavoritesLocalDataSource.create();
 
                             try {
@@ -152,7 +152,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                                 await favLocal.deleteFavorite(userId, l);
                               }
                               // Remote delete if we have a remote id
-                              final idStr = l.id?.toString();
+                              final idStr = l.id.toString();
                               if (idStr != null && !(idStr.startsWith('local_'))){
                                 await rem.eliminarLugarFavorito(usuarioId: userId, favoritoId: idStr);
                               } else if (favLocal != null && idStr != null) {

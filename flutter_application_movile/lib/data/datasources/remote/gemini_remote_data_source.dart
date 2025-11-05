@@ -1,24 +1,27 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'dart:async';
 
 class GeminiRemoteDataSource {
   final GenerativeModel _model;
 
   GeminiRemoteDataSource()
-      : _model = GenerativeModel(
-          model: 'gemini-2.0-flash',
-          apiKey: 'AIzaSyCRdCWt2LvoEVK44EmNXp1mXRYRzxGvSPQ', // Mover a .env después
-        );
+    : _model = GenerativeModel(
+        // Usar un modelo ampliamente soportado para evitar incompatibilidades
+        model: 'gemini-1.5-flash',
+        apiKey: 'AIzaSyDUe84YZlDVZs-9vAtOLFEks0yZXoFs7ro', // TODO: mover a .env
+      );
 
   Future<String> obtenerRecomendacion({
-    required String mensaje,
-    required double latitud,
-    required double longitud,
+    required String message,
+    required double latitude,
+    required double longitude,
   }) async {
     try {
-      final prompt = '''
+      final prompt =
+          '''
 🔍 CONTEXTO DEL USUARIO:
-Ubicación actual: $latitud, $longitud
-Consulta: "$mensaje"
+Ubicación actual: $latitude, $longitude
+Consulta: "$message"
 
 ROL:
 Eres un experto local en turismo, gastronomía y ocio urbano, con acceso a información real sobre lugares públicos, comercios y experiencias en la ciudad y sus alrededores.
@@ -95,7 +98,9 @@ Reglas para JSON_PLACES:
 - Si no estás seguro de coordenadas, usa valores aproximados plausibles de la zona.
 ''';
 
-      final response = await _model.generateContent([Content.text(prompt)]);
+      final response = await _model
+          .generateContent([Content.text(prompt)])
+          .timeout(const Duration(seconds: 20));
       return response.text ?? 'Lo siento, no pude generar una respuesta.';
     } catch (e) {
       throw Exception('Error con Gemini API: $e');

@@ -3,14 +3,14 @@ import 'package:flutter_application_movile/domain/entities/usuario_entity.dart';
 class UsuarioModel {
   final String id;
   final String email;
-  final String? nombre;
+  final String? name;
   final String? fotoPerfil;
   final DateTime createdAt;
 
   UsuarioModel({
     required this.id,
     required this.email,
-    this.nombre,
+    this.name,
     this.fotoPerfil,
     required this.createdAt,
   });
@@ -18,7 +18,7 @@ class UsuarioModel {
   factory UsuarioModel.fromJson(Map<String, dynamic> json) {
     final id = json['id'] as String? ?? '';
     final email = json['email'] as String? ?? '';
-    final nombre = json['nombre'] as String?;
+    final name = json['nombre'] as String?;
     final fotoPerfil = json['foto_perfil'] as String?;
     final createdRaw = json['created_at'];
     final createdAt = (createdRaw is String && createdRaw.isNotEmpty)
@@ -28,7 +28,7 @@ class UsuarioModel {
     return UsuarioModel(
       id: id,
       email: email,
-      nombre: nombre,
+      name: name,
       fotoPerfil: fotoPerfil,
       createdAt: createdAt,
     );
@@ -38,17 +38,17 @@ class UsuarioModel {
     return {
       'id': id,
       'email': email,
-      'nombre': nombre,
+      'nombre': name,
       'foto_perfil': fotoPerfil,
       'created_at': createdAt.toIso8601String(),
     };
   }
 
-  UsuarioEntity toEntity() {
-    return UsuarioEntity(
+  UserEntity toEntity() {
+    return UserEntity(
       id: id,
       email: email,
-      nombre: nombre,
+      name: name,
       fotoPerfil: fotoPerfil,
       createdAt: createdAt,
     );

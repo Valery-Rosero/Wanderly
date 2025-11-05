@@ -1,12 +1,12 @@
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 
 abstract class ChatRepository {
-  Future<String> enviarMensaje({
-    required String mensaje,
-    required double latitud,
-    required double longitud,
+  Future<String> sendMessage({
+    required String message,
+    required double latitude,
+    required double longitude,
   });
   
-  Future<void> guardarLugarFavorito(LugarEntity lugar);
-  Future<List<LugarEntity>> obtenerLugaresFavoritos();
+  Future<void> saveFavoritePlace(PlaceEntity place);
+  Future<List<PlaceEntity>> getFavoritePlaces();
 }

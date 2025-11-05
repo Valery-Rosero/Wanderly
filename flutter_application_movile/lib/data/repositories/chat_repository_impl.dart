@@ -6,13 +6,13 @@ import 'package:flutter_application_movile/domain/repositories/chat_repository.d
 
 class ChatRepositoryImpl implements ChatRepository {
   final GeminiRemoteDataSource _geminiDataSource;
-  final LugaresRemoteDataSource _lugaresDataSource;
+  final PlacesRemoteDataSource _lugaresDataSource;
   final FavoritesLocalDataSource? _favoritesLocal;
   final String _usuarioId;
 
   ChatRepositoryImpl({
     required GeminiRemoteDataSource geminiDataSource,
-    required LugaresRemoteDataSource lugaresDataSource,
+    required PlacesRemoteDataSource lugaresDataSource,
     FavoritesLocalDataSource? favoritesLocal,
     required String usuarioId,
   })  : _geminiDataSource = geminiDataSource,
@@ -21,69 +21,69 @@ class ChatRepositoryImpl implements ChatRepository {
         _usuarioId = usuarioId;
 
   @override
-  Future<String> enviarMensaje({
-    required String mensaje,
-    required double latitud,
-    required double longitud,
+  Future<String> sendMessage({
+    required String message,
+    required double latitude,
+    required double longitude,
   }) async {
     return await _geminiDataSource.obtenerRecomendacion(
-      mensaje: mensaje,
-      latitud: latitud,
-      longitud: longitud,
+      message: message,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 
   @override
-  Future<void> guardarLugarFavorito(LugarEntity lugar) async {
+  Future<void> saveFavoritePlace(PlaceEntity place) async {
     if (_favoritesLocal != null) {
       // Guarda localmente primero (offline-first)
-      final localId = await _favoritesLocal!.saveFavorite(_usuarioId, lugar);
+      final localId = await _favoritesLocal!.saveFavorite(_usuarioId, place);
       // Intenta sincronizar con Supabase; si falla, encola
       try {
-        await _lugaresDataSource.guardarLugarFavorito(
+        await _lugaresDataSource.saveFavoritePlace(
           usuarioId: _usuarioId,
-          nombreLugar: lugar.nombre,
-          direccion: lugar.direccion,
-          latitud: lugar.latitud,
-          longitud: lugar.longitud,
-          tipoLugar: lugar.tipoLugar,
+          nombreLugar: place.name,
+          address: place.address,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          placeType: place.placeType,
           notas: 'Guardado desde chat',
         );
-        await _favoritesLocal!.markFavoriteSynced(localId, lugar.id);
+        await _favoritesLocal!.markFavoriteSynced(localId, place.id);
       } catch (_) {
-        await _favoritesLocal!.enqueueSyncFavorite(_usuarioId, lugar);
+        await _favoritesLocal!.enqueueSyncFavorite(_usuarioId, place);
       }
     } else {
       // Web u otros entornos sin SQLite: inserta directamente en Supabase
-      await _lugaresDataSource.guardarLugarFavorito(
+      await _lugaresDataSource.saveFavoritePlace(
         usuarioId: _usuarioId,
-        nombreLugar: lugar.nombre,
-        direccion: lugar.direccion,
-        latitud: lugar.latitud,
-        longitud: lugar.longitud,
-        tipoLugar: lugar.tipoLugar,
+        nombreLugar: place.name,
+        address: place.address,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        placeType: place.placeType,
         notas: 'Guardado desde chat',
       );
     }
   }
 
   @override
-  Future<List<LugarEntity>> obtenerLugaresFavoritos() async {
+  Future<List<PlaceEntity>> getFavoritePlaces() async {
     if (_favoritesLocal != null) {
-      // Devuelve favoritos locales
+      // Devuelve favorites locales
       return _favoritesLocal!.getFavorites(_usuarioId);
     }
     // Fallback: leer de Supabase directamente en web
-    final data = await _lugaresDataSource.obtenerLugaresFavoritos(_usuarioId);
+    final data = await _lugaresDataSource.getFavoritePlaces(_usuarioId);
     return data.map((json) {
       final coordenadas = _parseCoordenadas(json['coordenadas']);
-      return LugarEntity(
+      return PlaceEntity(
         id: json['id'],
-        nombre: json['nombre_lugar'],
-        direccion: json['direccion'] ?? '',
-        latitud: coordenadas.$1,
-        longitud: coordenadas.$2,
-        tipoLugar: json['tipo_lugar'] ?? '',
+        name: json['nombre_lugar'],
+        address: json['direccion'] ?? '',
+        latitude: coordenadas.$1,
+        longitude: coordenadas.$2,
+        placeType: json['tipo_lugar'] ?? '',
       );
     }).toList();
   }

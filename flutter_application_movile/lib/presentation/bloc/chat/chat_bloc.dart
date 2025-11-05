@@ -17,13 +17,13 @@ class ChatInitial extends ChatState {}
 class ChatLoading extends ChatState {}
 
 class ChatLoaded extends ChatState {
-  final List<MensajeChatEntity> mensajes;
-  final List<LugarEntity> lugares;
+  final List<ChatMessageEntity> messages;
+  final List<PlaceEntity> places;
 
-  const ChatLoaded(this.mensajes, {this.lugares = const []});
+  const ChatLoaded(this.messages, {this.places = const []});
 
   @override
-  List<Object> get props => [mensajes, lugares];
+  List<Object> get props => [messages, places];
 }
 
 class ChatError extends ChatState {
@@ -43,86 +43,86 @@ abstract class ChatEvent extends Equatable {
   List<Object> get props => [];
 }
 
-class EnviarMensajeEvent extends ChatEvent {
-  final String mensaje;
-  final double latitud;
-  final double longitud;
+class SendMessageEvent extends ChatEvent {
+  final String message;
+  final double latitude;
+  final double longitude;
 
-  const EnviarMensajeEvent({
-    required this.mensaje,
-    required this.latitud,
-    required this.longitud,
+  const SendMessageEvent({
+    required this.message,
+    required this.latitude,
+    required this.longitude,
   });
 
   @override
-  List<Object> get props => [mensaje, latitud, longitud];
+  List<Object> get props => [message, latitude, longitude];
 }
 
 class GuardarLugarFavoritoEvent extends ChatEvent {
-  final LugarEntity lugar;
+  final PlaceEntity place;
 
-  const GuardarLugarFavoritoEvent(this.lugar);
+  const GuardarLugarFavoritoEvent(this.place);
 
   @override
-  List<Object> get props => [lugar];
+  List<Object> get props => [place];
 }
 
 // BLoC
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ChatRepository _chatRepository;
-  final List<MensajeChatEntity> _mensajes = [];
-  List<LugarEntity> _lugares = [];
+  final List<ChatMessageEntity> _mensajes = [];
+  List<PlaceEntity> _lugares = [];
 
   ChatBloc({required ChatRepository chatRepository})
       : _chatRepository = chatRepository,
         super(ChatInitial()) {
-    on<EnviarMensajeEvent>(_onEnviarMensaje);
+    on<SendMessageEvent>(_onEnviarMensaje);
     on<GuardarLugarFavoritoEvent>(_onGuardarLugarFavorito);
   }
 
   Future<void> _onEnviarMensaje(
-    EnviarMensajeEvent event,
+    SendMessageEvent event,
     Emitter<ChatState> emit,
   ) async {
-    // Agregar mensaje del usuario
-    _mensajes.add(MensajeChatEntity(
+    // Agregar message del user
+    _mensajes.add(ChatMessageEntity(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      contenido: event.mensaje,
+      contenido: event.message,
       esUsuario: true,
       timestamp: DateTime.now(),
     ));
-    emit(ChatLoaded(List.from(_mensajes), lugares: List.from(_lugares)));
+    emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
 
     try {
       // Obtener respuesta de Gemini
-      final respuesta = await _chatRepository.enviarMensaje(
-        mensaje: event.mensaje,
-        latitud: event.latitud,
-        longitud: event.longitud,
+      final respuesta = await _chatRepository.sendMessage(
+        message: event.message,
+        latitude: event.latitude,
+        longitude: event.longitude,
       );
 
       // Agregar respuesta del chatbot (texto)
-      _mensajes.add(MensajeChatEntity(
+      _mensajes.add(ChatMessageEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         contenido: respuesta,
         esUsuario: false,
         timestamp: DateTime.now(),
       ));
-      // Intentar extraer lugares del sufijo JSON_PLACES
+      // Intentar extraer places del sufijo JSON_PLACES
       _lugares = _parsePlacesFromResponse(respuesta);
-      emit(ChatLoaded(List.from(_mensajes), lugares: List.from(_lugares)));
+      emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
     } catch (e) {
-      _mensajes.add(MensajeChatEntity(
+      _mensajes.add(ChatMessageEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         contenido: 'Error: $e',
         esUsuario: false,
         timestamp: DateTime.now(),
       ));
-      emit(ChatLoaded(List.from(_mensajes), lugares: List.from(_lugares)));
+      emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
   }
   }
 
-  List<LugarEntity> _parsePlacesFromResponse(String respuesta) {
+  List<PlaceEntity> _parsePlacesFromResponse(String respuesta) {
     try {
       const marker = 'JSON_PLACES:';
       final idx = respuesta.lastIndexOf(marker);
@@ -137,13 +137,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         final lng = (p['lng'] is num) ? (p['lng'] as num).toDouble() : double.tryParse('${p['lng']}') ?? 0.0;
         final address = p['address']?.toString() ?? '';
         final type = p['type']?.toString() ?? 'sitio';
-        return LugarEntity(
+        return PlaceEntity(
           id: '${DateTime.now().millisecondsSinceEpoch}-${name}',
-          nombre: name,
-          direccion: address,
-          latitud: lat,
-          longitud: lng,
-          tipoLugar: type,
+          name: name,
+          address: address,
+          latitude: lat,
+          longitude: lng,
+          placeType: type,
         );
       }).toList();
     } catch (_) {
@@ -156,7 +156,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     Emitter<ChatState> emit,
   ) async {
     try {
-      await _chatRepository.guardarLugarFavorito(event.lugar);
+      await _chatRepository.saveFavoritePlace(event.place);
       // Podrías emitir un estado de éxito aquí
     } catch (e) {
       emit(ChatError('Error al guardar lugar favorito: $e'));

@@ -1,30 +1,30 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class LugaresRemoteDataSource {
+class PlacesRemoteDataSource {
   final SupabaseClient _supabase;
 
-  LugaresRemoteDataSource(this._supabase);
+  PlacesRemoteDataSource(this._supabase);
 
-  Future<void> guardarLugarFavorito({
+  Future<void> saveFavoritePlace({
     required String usuarioId,
     required String nombreLugar,
-    required String direccion,
-    required double latitud,
-    required double longitud,
-    required String tipoLugar,
+    required String address,
+    required double latitude,
+    required double longitude,
+    required String placeType,
     String? notas,
   }) async {
     await _supabase.from('lugares_favoritos').insert({
       'usuario_id': usuarioId,
       'nombre_lugar': nombreLugar,
-      'direccion': direccion,
-      'coordenadas': 'POINT($longitud $latitud)',
-      'tipo_lugar': tipoLugar,
+      'direccion': address,
+      'coordenadas': 'POINT($longitude $latitude)',
+      'tipo_lugar': placeType,
       'notas': notas,
     });
   }
 
-  Future<List<Map<String, dynamic>>> obtenerLugaresFavoritos(String usuarioId) async {
+  Future<List<Map<String, dynamic>>> getFavoritePlaces(String usuarioId) async {
     final response = await _supabase
         .from('lugares_favoritos')
         .select()

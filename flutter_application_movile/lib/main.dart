@@ -57,7 +57,7 @@ class AuthWrapper extends StatelessWidget {
         print('🔍 AuthWrapper - Estado actual: ${state.runtimeType}');
         
         if (state is AuthAuthenticated) {
-          print('✅ Navegando a HomePage - Usuario: ${state.usuario.email}');
+          print('✅ Navegando a HomePage - Usuario: ${state.user.email}');
           return const HomePage();
         } else if (state is AuthUnauthenticated) {
           print('🔐 Navegando a LoginPage');

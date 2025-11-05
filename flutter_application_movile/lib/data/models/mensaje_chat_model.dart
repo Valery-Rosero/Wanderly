@@ -1,27 +1,27 @@
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 
-class MensajeChatModel {
+class ChatMessageModel {
   final String id;
   final String contenido;
   final bool esUsuario;
   final DateTime timestamp;
-  final String? tipoLugar;
+  final String? placeType;
 
-  MensajeChatModel({
+  ChatMessageModel({
     required this.id,
     required this.contenido,
     required this.esUsuario,
     required this.timestamp,
-    this.tipoLugar,
+    this.placeType,
   });
 
-  factory MensajeChatModel.fromJson(Map<String, dynamic> json) {
-    return MensajeChatModel(
+  factory ChatMessageModel.fromJson(Map<String, dynamic> json) {
+    return ChatMessageModel(
       id: json['id'],
       contenido: json['contenido'],
       esUsuario: json['es_usuario'],
       timestamp: DateTime.parse(json['timestamp']),
-      tipoLugar: json['tipo_lugar'],
+      placeType: json['tipo_lugar'],
     );
   }
 
@@ -31,17 +31,17 @@ class MensajeChatModel {
       'contenido': contenido,
       'es_usuario': esUsuario,
       'timestamp': timestamp.toIso8601String(),
-      'tipo_lugar': tipoLugar,
+      'tipo_lugar': placeType,
     };
   }
 
-  MensajeChatEntity toEntity() {
-    return MensajeChatEntity(
+  ChatMessageEntity toEntity() {
+    return ChatMessageEntity(
       id: id,
       contenido: contenido,
       esUsuario: esUsuario,
       timestamp: timestamp,
-      tipoLugar: tipoLugar,
+      placeType: placeType,
     );
   }
 }

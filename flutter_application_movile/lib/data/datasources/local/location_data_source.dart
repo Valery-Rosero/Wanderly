@@ -37,13 +37,13 @@ class LocationDataSource {
     return permission;
   }
 
-  /// Obtiene la ubicación actual del dispositivo
+  /// Obtiene la ubicación current del dispositivo
   Future<Position> getCurrentLocation() async {
     try {
       // Verificar y obtener permisos
       await _checkPermissions();
 
-      // Obtener ubicación actual con alta precisión
+      // Obtener ubicación current con alta precisión
       return await Geolocator.getCurrentPosition(
         desiredAccuracy: kIsWeb ? LocationAccuracy.high : LocationAccuracy.best,
         timeLimit: const Duration(seconds: 20),

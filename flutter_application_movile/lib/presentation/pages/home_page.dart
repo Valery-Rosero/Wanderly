@@ -47,7 +47,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     print('🏠 HomePage initState llamado');
     _inicializarChat();
-    // Solicitar ubicación al inicio para centrar el mapa y dar contexto.
+    // Solicitar ubicación al inicio para centrar el map y dar contexto.
     _obtenerUbicacion();
   }
 
@@ -57,16 +57,16 @@ class _HomePageState extends State<HomePage> {
       final authState = context.read<AuthBloc>().state;
       
       if (authState is AuthAuthenticated) {
-        print('✅ Usuario autenticado: ${authState.usuario.id}');
+        print('✅ Usuario autenticado: ${authState.user.id}');
         // En web no inicializamos SQLite
         final favoritesLocal = kIsWeb ? null : await FavoritesLocalDataSource.create();
         
         _chatBloc = ChatBloc(
           chatRepository: ChatRepositoryImpl(
             geminiDataSource: GeminiRemoteDataSource(),
-            lugaresDataSource: LugaresRemoteDataSource(Supabase.instance.client),
+            lugaresDataSource: PlacesRemoteDataSource(Supabase.instance.client),
             favoritesLocal: favoritesLocal,
-            usuarioId: authState.usuario.id,
+            usuarioId: authState.user.id,
           ),
         );
         
@@ -254,8 +254,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _enviarMensaje(String mensaje) {
-    print('📤 Intentando enviar mensaje: $mensaje');
+  void _enviarMensaje(String message) {
+    print('📤 Intentando enviar mensaje: $message');
     
     if (!_chatInicializado) {
       print('❌ ChatBloc no inicializado');
@@ -265,10 +265,10 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // Enviar mensaje usando ubicación seleccionada (manual o automática).
+    // Enviar message usando ubicación seleccionada (manual o automática).
     final double lat = _ubicacionSeleccionada?.latitude ?? _ubicacionActual?.latitude ?? 0.0;
     final double lng = _ubicacionSeleccionada?.longitude ?? _ubicacionActual?.longitude ?? 0.0;
-    _chatBloc.add(EnviarMensajeEvent(mensaje: mensaje, latitud: lat, longitud: lng));
+    _chatBloc.add(SendMessageEvent(message: message, latitude: lat, longitude: lng));
   }
 
   void _cerrarSesion() {
@@ -445,23 +445,23 @@ class _HomePageState extends State<HomePage> {
               print('💬 ChatBloc State: ${state.runtimeType}');
               
               if (state is ChatLoaded) {
-                print('💬 Mensajes en chat: ${state.mensajes.length}');
+                print('💬 Mensajes en chat: ${state.messages.length}');
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   reverse: false,
-                  itemCount: state.mensajes.length,
+                  itemCount: state.messages.length,
                   itemBuilder: (context, index) {
-                    final mensaje = state.mensajes[index];
+                    final message = state.messages[index];
                     return AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
                       switchInCurve: Curves.easeOut,
                       switchOutCurve: Curves.easeIn,
                       child: KeyedSubtree(
-                        key: ValueKey(mensaje.id),
+                        key: ValueKey(message.id),
                         child: MensajeChatWidget(
-                          mensaje: mensaje,
+                          message: message,
                           onPlaceTap: _centerOnPlace,
-                          lugares: state.lugares,
+                          places: state.places,
                         ),
                       ),
                     );
@@ -477,10 +477,10 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
-                          _chatBloc.add(EnviarMensajeEvent(
-                            mensaje: 'Hola',
-                            latitud: 0.0,
-                            longitud: 0.0,
+                          _chatBloc.add(SendMessageEvent(
+                            message: 'Hola',
+                            latitude: 0.0,
+                            longitude: 0.0,
                           ));
                         },
                         child: const Text('Reintentar Chat'),
@@ -517,7 +517,7 @@ class _HomePageState extends State<HomePage> {
             },
           ),
         ),
-        // Barra de búsqueda principal (ubicada sobre el mapa)
+        // Barra de búsqueda principal (ubicada sobre el map)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Container(
@@ -556,11 +556,11 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ),
-        // Mapa embebido con ubicación y lugares sugeridos
+        // Mapa embebido con ubicación y places sugeridos
         BlocBuilder<ChatBloc, ChatState>(
           builder: (context, state) {
-            final lugares = state is ChatLoaded ? state.lugares : <LugarEntity>[];
-            return _buildMap(lugares);
+            final places = state is ChatLoaded ? state.places : <PlaceEntity>[];
+            return _buildMap(places);
           },
         ),
         if (_ubicacionSeleccionada != null || _ubicacionActual != null)
@@ -598,7 +598,7 @@ class _HomePageState extends State<HomePage> {
   );
   }
 
-  Widget _buildMap(List<LugarEntity> lugares) {
+  Widget _buildMap(List<PlaceEntity> places) {
     if (_ubicacionActual == null && _ubicacionSeleccionada == null) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -652,16 +652,16 @@ class _HomePageState extends State<HomePage> {
       ),
       
       // Enhanced markers for chatbot recommended places
-      ...lugares.asMap().entries.map((entry) {
+      ...places.asMap().entries.map((entry) {
         final index = entry.key;
-        final lugar = entry.value;
+        final place = entry.value;
         
         return Marker(
-          point: latlng.LatLng(lugar.latitud, lugar.longitud),
+          point: latlng.LatLng(place.latitude, place.longitude),
           width: 45,
           height: 45,
           child: GestureDetector(
-            onTap: () => _centerOnPlace(lugar),
+            onTap: () => _centerOnPlace(place),
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -687,7 +687,7 @@ class _HomePageState extends State<HomePage> {
                 alignment: Alignment.center,
                 children: [
                   Icon(
-                    _getPlaceIcon(lugar.tipoLugar),
+                    _getPlaceIcon(place.placeType),
                     color: Colors.white,
                     size: 20,
                   ),
@@ -971,8 +971,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Method to smoothly center map on a specific place
-  void _centerOnPlace(LugarEntity lugar) {
-    final placeLocation = latlng.LatLng(lugar.latitud, lugar.longitud);
+  void _centerOnPlace(PlaceEntity place) {
+    final placeLocation = latlng.LatLng(place.latitude, place.longitude);
     
     // Smooth animation to center on the place
     _mapController.move(placeLocation, 17.0);
@@ -988,7 +988,7 @@ class _HomePageState extends State<HomePage> {
         content: Row(
           children: [
             Icon(
-              _getPlaceIcon(lugar.tipoLugar),
+              _getPlaceIcon(place.placeType),
               color: Colors.white,
               size: 20,
             ),
@@ -999,15 +999,15 @@ class _HomePageState extends State<HomePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    lugar.nombre,
+                    place.name,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
                   ),
-                  if (lugar.direccion.isNotEmpty)
+                  if (place.address.isNotEmpty)
                     Text(
-                      lugar.direccion,
+                      place.address,
                       style: const TextStyle(fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1026,7 +1026,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
     
-    print('🎯 Centrado en: ${lugar.nombre} (${lugar.latitud}, ${lugar.longitud})');
+    print('🎯 Centrado en: ${place.name} (${place.latitude}, ${place.longitude})');
   }
 
 }

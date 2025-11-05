@@ -12,13 +12,13 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> signUpWithEmail({
     required String email,
     required String password,
-    required String nombre,
+    required String name,
   }) async {
     try {
       final AuthResponse response = await _supabase.auth.signUp(
         email: email,
         password: password,
-        data: {'nombre': nombre},
+        data: {'nombre': name},
       );
 
       final user = response.user;
@@ -26,7 +26,7 @@ class AuthRepositoryImpl implements AuthRepository {
         throw Exception('Error al crear usuario');
       }
 
-      // Verificar si el usuario ya existe en la tabla
+      // Verificar si el user ya existe en la tabla
       final existingUser = await _supabase
           .from('usuarios')
           .select()
@@ -37,7 +37,7 @@ class AuthRepositoryImpl implements AuthRepository {
         await _supabase.from('usuarios').insert({
           'id': user.id,
           'email': email,
-          'nombre': nombre,
+          'nombre': name,
           'created_at': DateTime.now().toIso8601String(),
         });
       }
@@ -96,14 +96,14 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Stream<UsuarioEntity?> get currentUser {
+  Stream<UserEntity?> get currentUser {
     return _supabase.auth.onAuthStateChange.map((authState) {
       final user = authState.session?.user;
       if (user != null) {
-        return UsuarioEntity(
+        return UserEntity(
           id: user.id,
           email: user.email ?? '',
-          nombre: user.userMetadata?['nombre'] as String?,
+          name: user.userMetadata?['nombre'] as String?,
           createdAt: DateTime.now(),
         );
       }
@@ -112,7 +112,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<UsuarioEntity?> getUsuarioActual() async {
+  Future<UserEntity?> getUsuarioActual() async {
     try {
       final user = _supabase.auth.currentUser;
       if (user != null) {
@@ -126,10 +126,10 @@ class AuthRepositoryImpl implements AuthRepository {
           return UsuarioModel.fromJson(response).toEntity();
         } else {
           // Si no existe en la tabla, crear entidad básica
-          return UsuarioEntity(
+          return UserEntity(
             id: user.id,
             email: user.email ?? '',
-            nombre: user.userMetadata?['nombre'] as String?,
+            name: user.userMetadata?['nombre'] as String?,
             createdAt: DateTime.now(),
           );
         }

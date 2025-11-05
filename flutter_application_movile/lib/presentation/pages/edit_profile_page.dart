@@ -26,7 +26,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   void _prefillCamposDesdeUsuario() {
     final authState = context.read<AuthBloc>().state;
     if (authState is AuthAuthenticated) {
-      final fullName = authState.usuario.nombre?.trim() ?? '';
+      final fullName = authState.user.name?.trim() ?? '';
       if (fullName.isNotEmpty) {
         final parts = fullName.split(RegExp(r'\s+'));
         _nombreController.text = parts.isNotEmpty ? parts.first : '';
@@ -43,11 +43,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _guardarCambios() async {
-    final nombre = _nombreController.text.trim();
+    final name = _nombreController.text.trim();
     final apellido = _apellidoController.text.trim();
     final ciudad = _ciudadSeleccionada;
 
-    if (nombre.isEmpty) {
+    if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('El nombre no puede estar vacío')),
       );
@@ -57,20 +57,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() { _guardando = true; });
 
     try {
-      final fullName = apellido.isNotEmpty ? '$nombre $apellido' : nombre;
+      final fullName = apellido.isNotEmpty ? '$name $apellido' : name;
       final client = Supabase.instance.client;
       final user = client.auth.currentUser;
       if (user == null) {
         throw Exception('No hay usuario autenticado');
       }
 
-      // Actualizar tabla usuarios (nombre)
+      // Actualizar tabla usuarios (name)
       await client
           .from('usuarios')
           .update({'nombre': fullName})
           .eq('id', user.id);
 
-      // Actualizar metadata del usuario (nombre y ciudad)
+      // Actualizar metadata del user (name y ciudad)
       await client.auth.updateUser(
         UserAttributes(
           data: {

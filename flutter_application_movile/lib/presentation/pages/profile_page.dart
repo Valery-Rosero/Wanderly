@@ -50,7 +50,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     try {
-      final userId = authState.usuario.id;
+      final userId = authState.user.id;
       final local = kIsWeb ? null : await ProfileLocalDataSource.create();
       final remote = UsuariosRemoteDataSource(Supabase.instance.client);
 
@@ -58,7 +58,7 @@ class _ProfilePageState extends State<ProfilePage> {
       if (local != null) {
         final lp = await local.getProfile(userId);
         if (lp != null) {
-          _nombreCtrl.text = lp.nombre ?? '';
+          _nombreCtrl.text = lp.name ?? '';
           _ubicacionCtrl.text = lp.ubicacionBase ?? '';
           _ciudadSeleccionada = lp.ubicacionBase;
           if (_ciudadSeleccionada != null && !_ciudades.contains(_ciudadSeleccionada)) {
@@ -74,7 +74,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       final rp = await remote.obtenerPerfil(userId);
       if (rp != null) {
-        _nombreCtrl.text = rp.nombre ?? _nombreCtrl.text;
+        _nombreCtrl.text = rp.name ?? _nombreCtrl.text;
         _ubicacionCtrl.text = rp.ubicacionBase ?? _ubicacionCtrl.text;
         _ciudadSeleccionada = rp.ubicacionBase ?? _ciudadSeleccionada;
         if (_ciudadSeleccionada != null && !_ciudades.contains(_ciudadSeleccionada)) {
@@ -107,9 +107,9 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() => _guardando = false);
       return;
     }
-    final userId = authState.usuario.id;
+    final userId = authState.user.id;
 
-    // Si no hay coordenadas base, intenta usar ubicación actual
+    // Si no hay coordenadas base, intenta usar ubicación current
     if (_baseLat == null || _baseLon == null) {
       try {
         final pos = await Geolocator.getCurrentPosition();
@@ -120,7 +120,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final perfil = UserProfile(
       userId: userId,
-      nombre: _toTitleCase(_nombreCtrl.text.trim()),
+      name: _toTitleCase(_nombreCtrl.text.trim()),
       apellido: null,
       ubicacionBase: _ciudadSeleccionada,
       baseLat: _baseLat,

@@ -23,15 +23,15 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _submit(BuildContext context) {
-    final nombre = nombreController.text.trim();
+    final name = nombreController.text.trim();
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (nombre.isEmpty || email.isEmpty || password.isEmpty) {
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
       setState(() => _errorMessage = 'Por favor completa todos los campos');
       return;
     }
-    if (nombre.length < 3) {
+    if (name.length < 3) {
       setState(() => _errorMessage = 'El nombre debe tener al menos 3 caracteres');
       return;
     }
@@ -49,7 +49,7 @@ class _RegisterPageState extends State<RegisterPage> {
           SignUpRequested(
             email: email,
             password: password,
-            nombre: nombre,
+            name: name,
           ),
         );
   }

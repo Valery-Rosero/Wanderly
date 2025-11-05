@@ -14,7 +14,7 @@ class UsuariosRemoteDataSource {
     if (response == null) return null;
     return UserProfile(
       userId: response['id'] as String,
-      nombre: response['nombre'] as String?,
+      name: response['nombre'] as String?,
       apellido: response['apellido'] as String?,
       ubicacionBase: response['ubicacion_base'] as String?,
       baseLat: (response['base_lat'] as num?)?.toDouble(),
@@ -25,7 +25,7 @@ class UsuariosRemoteDataSource {
   Future<void> actualizarPerfil(UserProfile perfil) async {
     await _supabase.from('usuarios').upsert({
       'id': perfil.userId,
-      'nombre': perfil.nombre,
+      'nombre': perfil.name,
       'ubicacion_base': perfil.ubicacionBase,
       'base_lat': perfil.baseLat,
       'base_lon': perfil.baseLon,

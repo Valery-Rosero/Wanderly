@@ -4,7 +4,7 @@ abstract class AuthRepository {
   Future<void> signUpWithEmail({
     required String email,
     required String password,
-    required String nombre,
+    required String name,
   });
 
   Future<void> signInWithEmail({
@@ -14,7 +14,7 @@ abstract class AuthRepository {
 
   Future<void> signOut();
 
-  Stream<UsuarioEntity?> get currentUser;
+  Stream<UserEntity?> get currentUser;
 
-  Future<UsuarioEntity?> getUsuarioActual();
+  Future<UserEntity?> getUsuarioActual();
 }
