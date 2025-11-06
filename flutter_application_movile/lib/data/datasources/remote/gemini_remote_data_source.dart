@@ -7,7 +7,7 @@ class GeminiRemoteDataSource {
   GeminiRemoteDataSource()
     : _model = GenerativeModel(
         // Usar un modelo ampliamente soportado para evitar incompatibilidades
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash',
         apiKey: 'AIzaSyDUe84YZlDVZs-9vAtOLFEks0yZXoFs7ro', // TODO: mover a .env
       );
 
