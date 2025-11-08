@@ -7,6 +7,10 @@ class PlaceEntity {
   final String placeType;
   final double? rating;
   final String? fotoUrl;
+  final String? phone;
+  final String? website;
+  final String? instagram;
+  final String? facebook;
 
   PlaceEntity({
     required this.id,
@@ -17,5 +21,9 @@ class PlaceEntity {
     required this.placeType,
     this.rating,
     this.fotoUrl,
+    this.phone,
+    this.website,
+    this.instagram,
+    this.facebook,
   });
 }

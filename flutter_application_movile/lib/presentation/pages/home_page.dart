@@ -22,6 +22,7 @@ import 'package:flutter_application_movile/presentation/widgets/input_chat_widge
 import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
 import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
 import 'package:flutter_application_movile/presentation/pages/favorites_page.dart';
+import 'package:flutter_application_movile/presentation/pages/map_full_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -40,6 +41,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _buscarCtrl = TextEditingController();
   bool _buscandoDireccion = false;
   String? _errorBusqueda;
+  bool _mapVisible = true;
   final MapController _mapController = MapController();
 
   @override
@@ -333,6 +335,15 @@ class _HomePageState extends State<HomePage> {
                 }
               },
             ),
+            IconButton(
+              icon: Icon(_mapVisible ? Icons.visibility : Icons.visibility_off),
+              tooltip: _mapVisible ? 'Ocultar mapa' : 'Mostrar mapa',
+              onPressed: () {
+                setState(() {
+                  _mapVisible = !_mapVisible;
+                });
+              },
+            ),
             if (_ubicacionCargando)
               const Padding(
                 padding: EdgeInsets.all(8.0),
@@ -517,52 +528,14 @@ class _HomePageState extends State<HomePage> {
             },
           ),
         ),
-        // Barra de búsqueda principal (ubicada sobre el map)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _buscarCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Buscar dirección o lugar…',
-                      prefixIcon: Icon(Icons.search),
-                      border: InputBorder.none,
-                    ),
-                    onSubmitted: (_) => _buscarDireccion(),
-                  ),
-                ),
-                TextButton(
-                  onPressed: _buscandoDireccion ? null : _buscarDireccion,
-                  child: _buscandoDireccion
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Buscar'),
-                ),
-              ],
-            ),
+        // Barra de búsqueda y mapa (se muestra sólo si _mapVisible)
+        if (_mapVisible)
+          BlocBuilder<ChatBloc, ChatState>(
+            builder: (context, state) {
+              final places = state is ChatLoaded ? state.places : <PlaceEntity>[];
+              return _buildMap(places);
+            },
           ),
-        ),
-        // Mapa embebido con ubicación y places sugeridos
-        BlocBuilder<ChatBloc, ChatState>(
-          builder: (context, state) {
-            final places = state is ChatLoaded ? state.places : <PlaceEntity>[];
-            return _buildMap(places);
-          },
-        ),
         if (_ubicacionSeleccionada != null || _ubicacionActual != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -782,10 +755,80 @@ class _HomePageState extends State<HomePage> {
                   MarkerLayer(markers: markers),
                 ],
               ),
+              // Botón para abrir el mapa en otra página cuando haya lugares
+              if (places.isNotEmpty)
+                Positioned(
+                  right: 12,
+                  bottom: 12,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MapFullPage(
+                            center: center,
+                            places: places,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('Abrir mapa'),
+                  ),
+                ),
+              // Search bar overlayed on top of the map (prevents page overflow)
+              Positioned(
+                left: 12,
+                right: 12, // full width with symmetric padding
+                top: 12,
+                child: SafeArea(
+                  top: true,
+                  minimum: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+                  child: Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _buscarCtrl,
+                            textAlignVertical: TextAlignVertical.center,
+                            decoration: const InputDecoration(
+                              hintText: 'Buscar dirección o lugar…',
+                              prefixIcon: Icon(Icons.search),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            onSubmitted: (_) => _buscarDireccion(),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _buscandoDireccion ? null : _buscarDireccion,
+                          child: _buscandoDireccion
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text('Buscar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               // Zoom controls
               Positioned(
                 right: 16,
-                top: 16,
+                top: 72, // place below the search bar
                 child: Column(
                   children: [
                     Container(

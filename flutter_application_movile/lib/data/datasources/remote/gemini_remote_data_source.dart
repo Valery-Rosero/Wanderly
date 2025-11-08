@@ -65,7 +65,7 @@ Breve descripción realista y personalizada
 
 2. Otras opciones cercanas
 
-2 o 3 lugares adicionales con distancia y una breve nota distintiva
+2 o 3 lugares adicionales con distancia y reales dentro de la ciudad y una breve nota distintiva
 
 3. Consejos prácticos
 

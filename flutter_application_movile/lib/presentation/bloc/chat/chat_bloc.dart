@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
+import 'package:http/http.dart' as http;
 
 abstract class ChatState extends Equatable {
   const ChatState();
@@ -110,6 +111,10 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       ));
       // Intentar extraer places del sufijo JSON_PLACES
       _lugares = _parsePlacesFromResponse(respuesta);
+      // Enriquecer lugares con datos reales (teléfono, web, dirección) usando Nominatim
+      if (_lugares.isNotEmpty) {
+        _lugares = await _enrichPlacesWithRealData(_lugares, event.latitude, event.longitude);
+      }
       emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
     } catch (e) {
       _mensajes.add(ChatMessageEntity(
@@ -149,6 +154,67 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Consulta Nominatim para obtener datos reales de contacto y dirección.
+  Future<List<PlaceEntity>> _enrichPlacesWithRealData(
+    List<PlaceEntity> basePlaces,
+    double latitude,
+    double longitude,
+  ) async {
+    final List<PlaceEntity> enriched = [];
+    for (final p in basePlaces) {
+      try {
+        final uri = Uri.parse(
+          'https://nominatim.openstreetmap.org/search?q='
+          '${Uri.encodeQueryComponent(p.name)}'
+          '&format=json&limit=1&extratags=1',
+        );
+        final response = await http.get(
+          uri,
+          headers: {
+            'User-Agent': 'WanderlyApp/1.0 (+https://wanderly.example)',
+            'Accept': 'application/json',
+          },
+        );
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body) as List<dynamic>;
+          if (data.isNotEmpty) {
+            final item = data.first as Map<String, dynamic>;
+            final Map<String, dynamic> extratags =
+                (item['extratags'] as Map<String, dynamic>?) ?? {};
+            final String? phone = (extratags['phone'] ?? extratags['contact:phone'])?.toString();
+            final String? website = (extratags['website'] ?? extratags['contact:website'])?.toString();
+            final String? instagram = extratags['contact:instagram']?.toString();
+            final String? facebook = extratags['contact:facebook']?.toString();
+            final String address = item['display_name']?.toString() ?? p.address;
+            final double? lat = double.tryParse(item['lat']?.toString() ?? '');
+            final double? lon = double.tryParse(item['lon']?.toString() ?? '');
+            enriched.add(PlaceEntity(
+              id: p.id,
+              name: p.name,
+              address: address,
+              latitude: lat ?? p.latitude,
+              longitude: lon ?? p.longitude,
+              placeType: p.placeType,
+              rating: p.rating,
+              fotoUrl: p.fotoUrl,
+              phone: phone,
+              website: website,
+              instagram: instagram,
+              facebook: facebook,
+            ));
+          } else {
+            enriched.add(p);
+          }
+        } else {
+          enriched.add(p);
+        }
+      } catch (_) {
+        enriched.add(p);
+      }
+    }
+    return enriched;
   }
 
   Future<void> _onGuardarLugarFavorito(

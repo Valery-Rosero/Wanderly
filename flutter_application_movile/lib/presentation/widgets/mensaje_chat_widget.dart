@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -67,10 +70,14 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
               ),
               const SizedBox(height: 8),
             ],
-            Text(
-              widget.message.contenido,
-              style: Theme.of(context).textTheme.bodyLarge,
+            // Texto del mensaje con formato simple de negrilla (**texto**)
+            SelectableText.rich(
+              TextSpan(children: _buildFormattedSpans(widget.message.contenido, Theme.of(context).textTheme.bodyLarge!)),
+              textAlign: TextAlign.left,
             ),
+
+            // Acciones rápidas para teléfonos y enlaces presentes en el contenido
+            ..._buildQuickActions(widget.message.contenido),
             
             // Enhanced place recommendations with tap-to-center functionality
             if (!isUser && widget.places != null && widget.places!.isNotEmpty) ...[
@@ -189,6 +196,38 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                       ),
                                       onPressed: () => widget.onPlaceTap?.call(place),
                                     ),
+                                    if (place.phone != null && place.phone!.isNotEmpty) ...[
+                                      IconButton(
+                                        tooltip: 'Llamar',
+                                        icon: const Icon(Icons.phone, color: Colors.green),
+                                        onPressed: () {
+                                          final tel = place.phone!.replaceAll(' ', '').replaceAll('-', '');
+                                          launchUrl(Uri.parse('tel:$tel'));
+                                        },
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Copiar número',
+                                        icon: const Icon(Icons.copy, color: Colors.black87),
+                                        onPressed: () async {
+                                          await Clipboard.setData(ClipboardData(text: place.phone!));
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Número copiado al portapapeles')),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                    if (place.website != null && place.website!.isNotEmpty)
+                                      IconButton(
+                                        tooltip: 'Abrir sitio web',
+                                        icon: const Icon(Icons.open_in_new, color: Colors.blue),
+                                        onPressed: () {
+                                          final url = place.website!;
+                                          final uri = Uri.parse(url.startsWith('http') ? url : 'https://$url');
+                                          launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        },
+                                      ),
                                     IconButton(
                                       tooltip: 'Guardar favorito',
                                       icon: AnimatedSwitcher(
@@ -312,6 +351,120 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
               ],
       ),
     );
+  }
+
+  // Convierte "**texto**" a negrilla y detecta URLs/teléfonos como spans clicables
+  List<TextSpan> _buildFormattedSpans(String text, TextStyle baseStyle) {
+    final List<TextSpan> spans = [];
+
+    // Helper para añadir segmentos que pueden contener URLs/teléfonos dentro
+    void addSegment(String segment, {bool bold = false}) {
+      final urlRegex = RegExp(r'(https?:\/\/[^\s)]+)');
+      final phoneRegex = RegExp(r'(\+?[0-9][0-9\s\-]{6,}[0-9])');
+
+      int index = 0;
+      while (index < segment.length) {
+        final urlMatch = urlRegex.matchAsPrefix(segment, index);
+        final phoneMatch = phoneRegex.matchAsPrefix(segment, index);
+
+        if (urlMatch != null) {
+          final urlText = urlMatch.group(0)!;
+          // Render azul subrayado para indicar enlace; acciones se ofrecen vía chips.
+          spans.add(TextSpan(
+            text: urlText,
+            style: baseStyle.copyWith(
+              color: Colors.blue,
+              decoration: TextDecoration.underline,
+              fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight,
+            ),
+          ));
+          index = urlMatch.end;
+        } else if (phoneMatch != null) {
+          final phoneText = phoneMatch.group(0)!.trim();
+          // Render azul subrayado para indicar teléfono; acciones se ofrecen vía chips.
+          spans.add(TextSpan(
+            text: phoneText,
+            style: baseStyle.copyWith(
+              color: Colors.blue,
+              decoration: TextDecoration.underline,
+              fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight,
+            ),
+          ));
+          index = phoneMatch.end;
+        } else {
+          // Texto normal
+          spans.add(TextSpan(
+            text: segment[index],
+            style: baseStyle.copyWith(fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight),
+          ));
+          index++;
+        }
+      }
+    }
+
+    // Parseo simple de **negrilla**
+    final parts = text.split('**');
+    for (int i = 0; i < parts.length; i++) {
+      final isBold = i % 2 == 1; // los índices impares están entre ** **
+      addSegment(parts[i], bold: isBold);
+    }
+
+    return spans;
+  }
+
+  // Construye chips de acción para copiar teléfonos y abrir enlaces
+  List<Widget> _buildQuickActions(String text) {
+    final urlRegex = RegExp(r'(https?:\/\/[^\s)]+)');
+    final phoneRegex = RegExp(r'(\+?[0-9][0-9\s\-]{6,}[0-9])');
+
+    final urls = urlRegex.allMatches(text).map((m) => m.group(0)!).toList();
+    final phones = phoneRegex.allMatches(text).map((m) => m.group(0)!.trim()).toList();
+
+    final widgets = <Widget>[];
+
+    if (phones.isNotEmpty || urls.isNotEmpty) {
+      widgets.add(const SizedBox(height: 8));
+      widgets.add(Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          ...phones.map((p) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ActionChip(
+                    label: Text('Llamar $p'),
+                    avatar: const Icon(Icons.phone, size: 16),
+                    onPressed: () {
+                      final uri = Uri.parse('tel:${p.replaceAll(' ', '').replaceAll('-', '')}');
+                      launchUrl(uri);
+                    },
+                  ),
+                  IconButton(
+                    tooltip: 'Copiar número',
+                    icon: const Icon(Icons.copy, size: 18),
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: p));
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Número copiado al portapapeles')),
+                        );
+                      }
+                    },
+                  ),
+                ],
+              )),
+          ...urls.map((u) => ActionChip(
+                label: const Text('Abrir enlace'),
+                avatar: const Icon(Icons.link, size: 16),
+                onPressed: () {
+                  launchUrl(Uri.parse(u), mode: LaunchMode.externalApplication);
+                },
+              )),
+        ],
+      ));
+    }
+
+    return widgets;
   }
 
   // Helper method to get appropriate icon for place type
