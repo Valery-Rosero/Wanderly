@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart'; 
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
@@ -44,6 +45,16 @@ abstract class ChatEvent extends Equatable {
   List<Object> get props => [];
 }
 
+class LoadChatHistoryEvent extends ChatEvent {
+  final String usuarioId;
+  final int limit;
+
+  const LoadChatHistoryEvent({required this.usuarioId, this.limit = 200});
+
+  @override
+  List<Object> get props => [usuarioId, limit];
+}
+
 class SendMessageEvent extends ChatEvent {
   final String message;
   final double latitude;
@@ -73,12 +84,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ChatRepository _chatRepository;
   final List<ChatMessageEntity> _mensajes = [];
   List<PlaceEntity> _lugares = [];
+  final String _usuarioId;
 
-  ChatBloc({required ChatRepository chatRepository})
+  ChatBloc({required ChatRepository chatRepository, required String usuarioId})
       : _chatRepository = chatRepository,
+        _usuarioId = usuarioId,
         super(ChatInitial()) {
     on<SendMessageEvent>(_onEnviarMensaje);
     on<GuardarLugarFavoritoEvent>(_onGuardarLugarFavorito);
+    on<LoadChatHistoryEvent>(_onLoadChatHistory);
   }
 
   Future<void> _onEnviarMensaje(
@@ -92,6 +106,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       esUsuario: true,
       timestamp: DateTime.now(),
     ));
+    // Persistir historial local en móvil
+    if (!kIsWeb) {
+      await _chatRepository.saveChatMessage(
+        userId: _usuarioId,
+        contenido: event.message,
+        esUsuario: true,
+        timestamp: DateTime.now(),
+      );
+    }
     emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
 
     try {
@@ -109,6 +132,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         esUsuario: false,
         timestamp: DateTime.now(),
       ));
+      if (!kIsWeb) {
+        await _chatRepository.saveChatMessage(
+          userId: _usuarioId,
+          contenido: respuesta,
+          esUsuario: false,
+          timestamp: DateTime.now(),
+        );
+      }
       // Intentar extraer places del sufijo JSON_PLACES
       _lugares = _parsePlacesFromResponse(respuesta);
       // Enriquecer lugares con datos reales (teléfono, web, dirección) usando Nominatim
@@ -125,6 +156,24 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       ));
       emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
   }
+  }
+
+  Future<void> _onLoadChatHistory(
+    LoadChatHistoryEvent event,
+    Emitter<ChatState> emit,
+  ) async {
+    try {
+      final history = await _chatRepository.getChatHistory(
+        userId: event.usuarioId,
+        limit: event.limit,
+      );
+      _mensajes
+        ..clear()
+        ..addAll(history);
+      emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
+    } catch (e) {
+      emit(ChatError('No se pudo cargar historial: $e'));
+    }
   }
 
   List<PlaceEntity> _parsePlacesFromResponse(String respuesta) {

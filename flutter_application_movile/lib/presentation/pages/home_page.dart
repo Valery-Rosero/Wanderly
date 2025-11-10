@@ -12,7 +12,9 @@ import 'package:flutter_application_movile/data/datasources/local/location_data_
 import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/routing_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/local/chat_history_local_data_source.dart';
 import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
@@ -43,6 +45,8 @@ class _HomePageState extends State<HomePage> {
   String? _errorBusqueda;
   bool _mapVisible = true;
   final MapController _mapController = MapController();
+  final RoutingRemoteDataSource _routing = RoutingRemoteDataSource();
+  List<latlng.LatLng> _routePoints = [];
 
   @override
   void initState() {
@@ -62,20 +66,27 @@ class _HomePageState extends State<HomePage> {
         print('✅ Usuario autenticado: ${authState.user.id}');
         // En web no inicializamos SQLite
         final favoritesLocal = kIsWeb ? null : await FavoritesLocalDataSource.create();
+        final historyLocal = kIsWeb ? null : await ChatHistoryLocalDataSource.create();
         
         _chatBloc = ChatBloc(
           chatRepository: ChatRepositoryImpl(
             geminiDataSource: GeminiRemoteDataSource(),
             lugaresDataSource: PlacesRemoteDataSource(Supabase.instance.client),
             favoritesLocal: favoritesLocal,
+            historyLocal: historyLocal,
             usuarioId: authState.user.id,
           ),
+          usuarioId: authState.user.id,
         );
         
         print('🎉 ChatBloc inicializado exitosamente');
         setState(() {
           _chatInicializado = true;
         });
+        // Cargar historial de chat (móvil)
+        if (!kIsWeb) {
+          _chatBloc.add(LoadChatHistoryEvent(usuarioId: authState.user.id));
+        }
       } else {
         print('❌ Usuario no autenticado en _inicializarChat');
       }
@@ -752,6 +763,16 @@ class _HomePageState extends State<HomePage> {
                     maxNativeZoom: 19,
                     zoomOffset: 0,
                   ),
+                  if (_routePoints.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: _routePoints,
+                          strokeWidth: 4,
+                          color: Colors.deepPurple,
+                        ),
+                      ],
+                    ),
                   MarkerLayer(markers: markers),
                 ],
               ),
@@ -915,13 +936,43 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                    if (_routePoints.isNotEmpty)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              setState(() {
+                                _routePoints = [];
+                              });
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Icon(Icons.clear, size: 20),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1014,7 +1065,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Method to smoothly center map on a specific place
-  void _centerOnPlace(PlaceEntity place) {
+  void _centerOnPlace(PlaceEntity place) async {
     final placeLocation = latlng.LatLng(place.latitude, place.longitude);
     
     // Smooth animation to center on the place
@@ -1024,6 +1075,25 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _ubicacionSeleccionada = placeLocation;
     });
+
+    // Draw route from current location if available
+    try {
+      if (_ubicacionActual != null) {
+        final points = await _routing.getRoute(
+          startLat: _ubicacionActual!.latitude,
+          startLon: _ubicacionActual!.longitude,
+          endLat: place.latitude,
+          endLon: place.longitude,
+        );
+        setState(() {
+          _routePoints = points
+              .map((p) => latlng.LatLng(p[0], p[1]))
+              .toList();
+        });
+      }
+    } catch (e) {
+      print('⚠️ Error fetching route: $e');
+    }
     
     // Show a snackbar with place information
     ScaffoldMessenger.of(context).showSnackBar(
