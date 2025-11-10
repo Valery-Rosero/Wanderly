@@ -20,6 +20,7 @@ import 'package:flutter_application_movile/presentation/pages/map_full_page.dart
 import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
 import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
 import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
+import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -164,6 +165,7 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _ubicacionActual = position;
         _ubicacionCargando = false;
+        _errorUbicacion = null;
       });
 
       // Auto-center map on user location with high precision
@@ -380,7 +382,7 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Column(
       children: [
-        if (_errorUbicacion != null)
+        if (_errorUbicacion != null && _ubicacionActual == null)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -411,28 +413,44 @@ class _HomePageState extends State<HomePage> {
             builder: (context, state) {
               print('💬 ChatBloc State: ${state.runtimeType}');
               
-              if (state is ChatLoaded) {
-                print('💬 Mensajes en chat: ${state.messages.length}');
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  reverse: false,
-                  itemCount: state.messages.length,
-                  itemBuilder: (context, index) {
-                    final message = state.messages[index];
-                    return AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 250),
-                      switchInCurve: Curves.easeOut,
-                      switchOutCurve: Curves.easeIn,
-                      child: KeyedSubtree(
-                        key: ValueKey(message.id),
-                        child: MensajeChatWidget(
-                          message: message,
-                          onPlaceTap: _centerOnPlace,
-                          places: state.places,
+              if (state is ChatLoading) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 12),
+                      Text('La IA está respondiendo…'),
+                    ],
+                  ),
+                );
+              } else if (state is ChatLoaded && state.places.isNotEmpty) {
+                // Hacer scroll conjunto: texto del bot + lugares
+                final String? botText = _extraerUltimoMensajeBot(state.messages);
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (botText != null && botText.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Text(
+                                botText,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      const SizedBox(height: 8),
+                      _buildPlacesList(state.places),
+                    ],
+                  ),
                 );
               }
               else if (state is ChatError) {
@@ -463,70 +481,104 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.chat_bubble_rounded, size: 50, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text('Bienvenido a Wanderly!'),
-                      SizedBox(height: 8),
-                      Text('Pregúntame sobre lugares interesantes', 
-                           style: TextStyle(fontSize: 14, color: Colors.grey)),
+                      SizedBox(height: 12),
+                      Text('Escribe a la IA para obtener recomendaciones'),
                     ],
                   ),
                 );
               }
               
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Cargando chat...'),
-                  ],
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+        // Se elimina el mapa del Home; sólo se mostrará al tocar un lugar.
+        SafeArea(
+          top: false,
+          child: BlocBuilder<ChatBloc, ChatState>(
+            builder: (context, state) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                      ? MediaQuery.of(context).viewInsets.bottom
+                      : 8,
+                ),
+                child: InputChatWidget(
+                  onEnviarMensaje: _enviarMensaje,
+                  estaCargando: state is ChatLoading,
+                  onUsarUbicacion: _obtenerUbicacion,
                 ),
               );
             },
           ),
         ),
-        // Barra de búsqueda y mapa (se muestra sólo si _mapVisible)
-        if (_mapVisible)
-          BlocBuilder<ChatBloc, ChatState>(
-            builder: (context, state) {
-              final places = state is ChatLoaded ? state.places : <PlaceEntity>[];
-              return _buildMap(places);
-            },
-          ),
-        if (_ubicacionSeleccionada != null || _ubicacionActual != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
-                  ],
-                ),
-                child: Text(
-                  'Lat: ${(_ubicacionSeleccionada?.latitude ?? _ubicacionActual!.latitude).toStringAsFixed(5)} · Lng: ${(_ubicacionSeleccionada?.longitude ?? _ubicacionActual!.longitude).toStringAsFixed(5)}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ),
-            ),
-          ),
-        BlocBuilder<ChatBloc, ChatState>(
-          builder: (context, state) {
-            return InputChatWidget(
-              onEnviarMensaje: _enviarMensaje,
-              estaCargando: state is ChatLoading,
-              onUsarUbicacion: _obtenerUbicacion,
-            );
-          },
-        ),
       ],
     ),
   );
+  }
+
+  Widget _buildPlacesList(List<PlaceEntity> places) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemBuilder: (context, index) {
+        final p = places[index];
+        return ListTile(
+          leading: const Icon(Icons.place, color: Colors.deepPurple),
+          title: Text(p.name),
+          subtitle: Text(p.address ?? 'Sin dirección'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Agregar a favoritos',
+                icon: const Icon(Icons.favorite_border, color: Colors.pinkAccent),
+                onPressed: () {
+                  if (_chatInicializado) {
+                    _chatBloc.add(GuardarLugarFavoritoEvent(p));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Lugar agregado a favoritos')),
+                    );
+                  }
+                },
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          onTap: () => _openMapForPlace(p, places),
+        );
+      },
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemCount: places.length,
+    );
+  }
+
+  void _openMapForPlace(PlaceEntity place, List<PlaceEntity> places) async {
+    final userLoc = _ubicacionActual != null
+        ? latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude)
+        : null;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapFullPage(
+          center: latlng.LatLng(place.latitude, place.longitude),
+          places: places,
+          userLocation: userLoc,
+          selectedPlace: place,
+        ),
+      ),
+    );
+  }
+
+  String? _extraerUltimoMensajeBot(List<ChatMessageEntity> mensajes) {
+    for (int i = mensajes.length - 1; i >= 0; i--) {
+      final m = mensajes[i];
+      if (m.esUsuario == false && (m.contenido.isNotEmpty)) {
+        return m.contenido;
+      }
+    }
+    return null;
   }
 
   Drawer _buildMainDrawer() {

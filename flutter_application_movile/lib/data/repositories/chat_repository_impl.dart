@@ -81,7 +81,7 @@ class ChatRepositoryImpl implements ChatRepository {
       final localId = await _favoritesLocal.saveFavorite(_usuarioId, place);
       // Intenta sincronizar con Supabase; si falla, encola
       try {
-        await _lugaresDataSource.saveFavoritePlace(
+        final remoteId = await _lugaresDataSource.saveFavoritePlace(
           usuarioId: _usuarioId,
           nombreLugar: place.name,
           address: place.address,
@@ -90,7 +90,7 @@ class ChatRepositoryImpl implements ChatRepository {
           placeType: place.placeType,
           notas: 'Guardado desde chat',
         );
-        await _favoritesLocal.markFavoriteSynced(localId, place.id);
+        await _favoritesLocal.markFavoriteSynced(localId, remoteId);
       } catch (_) {
         await _favoritesLocal.enqueueSyncFavorite(_usuarioId, place);
       }

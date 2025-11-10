@@ -151,13 +151,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
                               if (favLocal != null) {
                                 await favLocal.deleteFavorite(userId, l);
                               }
-                              // Remote delete if we have a remote id
+                              // Remote delete only if the ID looks like a Supabase row id (numeric)
                               final idStr = l.id.toString();
-                              if (!(idStr.startsWith('local_'))){
+                              final isNumericId = RegExp(r'^\d+$').hasMatch(idStr);
+                              if (isNumericId) {
                                 await rem.eliminarLugarFavorito(usuarioId: userId, favoritoId: idStr);
-                              } else if (favLocal != null) {
-                                // Enqueue delete if remote id known but offline failure
-                                await favLocal.enqueueSyncDeleteFavorite(userId, idStr);
                               }
                               setState(() {
                                 _favoritos.removeAt(i);

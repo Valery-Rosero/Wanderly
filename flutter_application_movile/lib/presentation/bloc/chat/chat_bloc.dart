@@ -116,7 +116,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         timestamp: DateTime.now(),
       );
     }
-    emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
+    // Mostrar estado de carga mientras la IA responde
+    emit(ChatLoading());
 
     try {
       // Obtener respuesta de Gemini
