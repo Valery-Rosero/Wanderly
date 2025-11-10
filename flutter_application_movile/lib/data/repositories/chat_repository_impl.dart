@@ -1,7 +1,7 @@
+import 'package:flutter_application_movile/data/datasources/local/chat_history_local_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/local/chat_history_local_data_source.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
@@ -54,7 +54,7 @@ class ChatRepositoryImpl implements ChatRepository {
       timestamp: timestamp,
       placeType: placeType,
     );
-    await _historyLocal!.addMessage(userId, msg);
+    await _historyLocal.addMessage(userId, msg);
   }
 
   @override
@@ -63,7 +63,7 @@ class ChatRepositoryImpl implements ChatRepository {
     int limit = 200,
   }) async {
     if (_historyLocal == null) return [];
-    return _historyLocal!.getMessages(userId, limit: limit);
+    return _historyLocal.getMessages(userId, limit: limit);
   }
 
   @override
@@ -71,14 +71,14 @@ class ChatRepositoryImpl implements ChatRepository {
     required String userId,
   }) async {
     if (_historyLocal == null) return;
-    await _historyLocal!.clearHistory(userId);
+    await _historyLocal.clearHistory(userId);
   }
 
   @override
   Future<void> saveFavoritePlace(PlaceEntity place) async {
     if (_favoritesLocal != null) {
       // Guarda localmente primero (offline-first)
-      final localId = await _favoritesLocal!.saveFavorite(_usuarioId, place);
+      final localId = await _favoritesLocal.saveFavorite(_usuarioId, place);
       // Intenta sincronizar con Supabase; si falla, encola
       try {
         await _lugaresDataSource.saveFavoritePlace(
@@ -90,9 +90,9 @@ class ChatRepositoryImpl implements ChatRepository {
           placeType: place.placeType,
           notas: 'Guardado desde chat',
         );
-        await _favoritesLocal!.markFavoriteSynced(localId, place.id);
+        await _favoritesLocal.markFavoriteSynced(localId, place.id);
       } catch (_) {
-        await _favoritesLocal!.enqueueSyncFavorite(_usuarioId, place);
+        await _favoritesLocal.enqueueSyncFavorite(_usuarioId, place);
       }
     } else {
       // Web u otros entornos sin SQLite: inserta directamente en Supabase
@@ -112,7 +112,7 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<List<PlaceEntity>> getFavoritePlaces() async {
     if (_favoritesLocal != null) {
       // Devuelve favorites locales
-      return _favoritesLocal!.getFavorites(_usuarioId);
+      return _favoritesLocal.getFavorites(_usuarioId);
     }
     // Fallback: leer de Supabase directamente en web
     final data = await _lugaresDataSource.getFavoritePlaces(_usuarioId);

@@ -1,30 +1,30 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_application_movile/core/theme/app_theme.dart';
+import 'package:flutter_application_movile/data/datasources/local/chat_history_local_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/routing_remote_data_source.dart';
+import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
+import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
+import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
+import 'package:flutter_application_movile/presentation/pages/favorites_page.dart';
+import 'package:flutter_application_movile/presentation/pages/history_page.dart';
+import 'package:flutter_application_movile/presentation/pages/map_full_page.dart';
+import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
+import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
+import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:async';
-
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
-import 'package:flutter_application_movile/data/datasources/local/location_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/routing_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/local/chat_history_local_data_source.dart';
-import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
-import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
-import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
-import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
-import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
-import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
-import 'package:flutter_application_movile/presentation/pages/favorites_page.dart';
-import 'package:flutter_application_movile/presentation/pages/map_full_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -35,6 +35,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late ChatBloc _chatBloc;
+  late ChatRepository _chatRepo;
   Position? _ubicacionActual;
   latlng.LatLng? _ubicacionSeleccionada;
   bool _ubicacionCargando = false;
@@ -68,14 +69,15 @@ class _HomePageState extends State<HomePage> {
         final favoritesLocal = kIsWeb ? null : await FavoritesLocalDataSource.create();
         final historyLocal = kIsWeb ? null : await ChatHistoryLocalDataSource.create();
         
-        _chatBloc = ChatBloc(
-          chatRepository: ChatRepositoryImpl(
+        _chatRepo = ChatRepositoryImpl(
             geminiDataSource: GeminiRemoteDataSource(),
             lugaresDataSource: PlacesRemoteDataSource(Supabase.instance.client),
             favoritesLocal: favoritesLocal,
             historyLocal: historyLocal,
             usuarioId: authState.user.id,
-          ),
+          );
+        _chatBloc = ChatBloc(
+          chatRepository: _chatRepo,
           usuarioId: authState.user.id,
         );
         
@@ -278,9 +280,16 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // Enviar message usando ubicación seleccionada (manual o automática).
-    final double lat = _ubicacionSeleccionada?.latitude ?? _ubicacionActual?.latitude ?? 0.0;
-    final double lng = _ubicacionSeleccionada?.longitude ?? _ubicacionActual?.longitude ?? 0.0;
+    // Siempre usar la ubicación actual del dispositivo durante la conversación.
+    if (_ubicacionActual == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se ha obtenido la ubicación actual. Autoriza ubicación e intenta nuevamente.')),
+      );
+      _obtenerUbicacion();
+      return;
+    }
+    final double lat = _ubicacionActual!.latitude;
+    final double lng = _ubicacionActual!.longitude;
     _chatBloc.add(SendMessageEvent(message: message, latitude: lat, longitude: lng));
   }
 
@@ -344,6 +353,18 @@ class _HomePageState extends State<HomePage> {
                   final lon = (c['lon'] as num).toDouble();
                   _mapController.move(latlng.LatLng(lat, lon), 16.0);
                 }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.history),
+              tooltip: 'Historial',
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HistoryPage(chatRepository: _chatRepo, usuarioId: (context.read<AuthBloc>().state as AuthAuthenticated).user.id),
+                  ),
+                );
               },
             ),
             IconButton(
@@ -499,10 +520,12 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
+                          final lat = _ubicacionActual?.latitude ?? 0.0;
+                          final lon = _ubicacionActual?.longitude ?? 0.0;
                           _chatBloc.add(SendMessageEvent(
                             message: 'Hola',
-                            latitude: 0.0,
-                            longitude: 0.0,
+                            latitude: lat,
+                            longitude: lon,
                           ));
                         },
                         child: const Text('Reintentar Chat'),

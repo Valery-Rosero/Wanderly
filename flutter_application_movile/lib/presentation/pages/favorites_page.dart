@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
-import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/local/profile_local_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});
@@ -153,9 +153,9 @@ class _FavoritesPageState extends State<FavoritesPage> {
                               }
                               // Remote delete if we have a remote id
                               final idStr = l.id.toString();
-                              if (idStr != null && !(idStr.startsWith('local_'))){
+                              if (!(idStr.startsWith('local_'))){
                                 await rem.eliminarLugarFavorito(usuarioId: userId, favoritoId: idStr);
-                              } else if (favLocal != null && idStr != null) {
+                              } else if (favLocal != null) {
                                 // Enqueue delete if remote id known but offline failure
                                 await favLocal.enqueueSyncDeleteFavorite(userId, idStr);
                               }

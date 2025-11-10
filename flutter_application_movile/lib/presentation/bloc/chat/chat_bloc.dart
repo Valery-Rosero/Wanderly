@@ -1,10 +1,11 @@
-import 'package:equatable/equatable.dart'; 
-import 'package:flutter/foundation.dart';
 import 'dart:convert';
-import 'package:flutter_bloc/flutter_bloc.dart';
+
+import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 
 abstract class ChatState extends Equatable {
@@ -125,17 +126,18 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         longitude: event.longitude,
       );
 
-      // Agregar respuesta del chatbot (texto)
+      // Agregar respuesta del chatbot (texto sin JSON visible)
+      final visibleText = _stripJsonSuffix(respuesta);
       _mensajes.add(ChatMessageEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        contenido: respuesta,
+        contenido: visibleText,
         esUsuario: false,
         timestamp: DateTime.now(),
       ));
       if (!kIsWeb) {
         await _chatRepository.saveChatMessage(
           userId: _usuarioId,
-          contenido: respuesta,
+          contenido: visibleText,
           esUsuario: false,
           timestamp: DateTime.now(),
         );
@@ -192,7 +194,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         final address = p['address']?.toString() ?? '';
         final type = p['type']?.toString() ?? 'sitio';
         return PlaceEntity(
-          id: '${DateTime.now().millisecondsSinceEpoch}-${name}',
+          id: '${DateTime.now().millisecondsSinceEpoch}-$name',
           name: name,
           address: address,
           latitude: lat,
@@ -203,6 +205,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     } catch (_) {
       return [];
     }
+  }
+
+  String _stripJsonSuffix(String respuesta) {
+    const marker = 'JSON_PLACES:';
+    final idx = respuesta.lastIndexOf(marker);
+    if (idx == -1) return respuesta;
+    return respuesta.substring(0, idx).trim();
   }
 
   /// Consulta Nominatim para obtener datos reales de contacto y dirección.
