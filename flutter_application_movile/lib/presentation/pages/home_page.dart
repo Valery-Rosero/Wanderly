@@ -334,85 +334,9 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.person),
-              tooltip: 'Perfil',
-              onPressed: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.favorite),
-              tooltip: 'Favoritos',
-              onPressed: () async {
-                final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage()));
-                if (result is Map && result['centerOn'] is Map) {
-                  final c = result['centerOn'] as Map;
-                  final lat = (c['lat'] as num).toDouble();
-                  final lon = (c['lon'] as num).toDouble();
-                  _mapController.move(latlng.LatLng(lat, lon), 16.0);
-                }
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.history),
-              tooltip: 'Historial',
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => HistoryPage(chatRepository: _chatRepo, usuarioId: (context.read<AuthBloc>().state as AuthAuthenticated).user.id),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: Icon(_mapVisible ? Icons.visibility : Icons.visibility_off),
-              tooltip: _mapVisible ? 'Ocultar mapa' : 'Mostrar mapa',
-              onPressed: () {
-                setState(() {
-                  _mapVisible = !_mapVisible;
-                });
-              },
-            ),
-            if (_ubicacionCargando)
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else if (_ubicacionActual != null)
-              IconButton(
-                icon: const Icon(Icons.location_on, color: Colors.green),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Ubicación: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, '
-                        '${_ubicacionActual!.longitude.toStringAsFixed(4)}',
-                      ),
-                    ),
-                  );
-                },
-                tooltip: 'Ubicación obtenida',
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.location_off, color: Colors.red),
-                onPressed: _obtenerUbicacion,
-                tooltip: 'Permitir ubicación',
-              ),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: _cerrarSesion,
-              tooltip: 'Cerrar Sesión',
-            ),
-          ],
+          actions: const [],
         ),
+        drawer: _buildMainDrawer(),
         body: _buildBody(),
       ),
     );
@@ -603,6 +527,110 @@ class _HomePageState extends State<HomePage> {
       ],
     ),
   );
+  }
+
+  Drawer _buildMainDrawer() {
+    final authState = context.read<AuthBloc>().state;
+    final userName = authState is AuthAuthenticated ? (authState.user.name ?? authState.user.email) : 'Invitado';
+    final hasLocation = _ubicacionActual != null;
+
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(gradient: AppTheme.accentGradient),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Text('Wanderly', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(userName, style: const TextStyle(color: Colors.white70)),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Perfil'),
+              onTap: () async {
+                Navigator.pop(context);
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.favorite),
+              title: const Text('Favoritos'),
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage()));
+                if (result is Map && result['centerOn'] is Map) {
+                  final c = result['centerOn'] as Map;
+                  final lat = (c['lat'] as num).toDouble();
+                  final lon = (c['lon'] as num).toDouble();
+                  _mapController.move(latlng.LatLng(lat, lon), 16.0);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history),
+              title: const Text('Historial'),
+              onTap: () async {
+                Navigator.pop(context);
+                final uid = (context.read<AuthBloc>().state as AuthAuthenticated).user.id;
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HistoryPage(chatRepository: _chatRepo, usuarioId: uid),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            SwitchListTile(
+              value: _mapVisible,
+              secondary: const Icon(Icons.map),
+              title: const Text('Mostrar mapa'),
+              onChanged: (v) {
+                setState(() {
+                  _mapVisible = v;
+                });
+              },
+            ),
+            ListTile(
+              leading: Icon(hasLocation ? Icons.location_on : Icons.location_off, color: hasLocation ? Colors.green : Colors.red),
+              title: Text(hasLocation
+                  ? 'Ubicación actual: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, ${_ubicacionActual!.longitude.toStringAsFixed(4)}'
+                  : 'Permitir ubicación'),
+              onTap: () {
+                Navigator.pop(context);
+                if (!hasLocation) {
+                  _obtenerUbicacion();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Ubicación: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, ${_ubicacionActual!.longitude.toStringAsFixed(4)}',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+            const Spacer(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Cerrar sesión'),
+              onTap: () {
+                Navigator.pop(context);
+                _cerrarSesion();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildMap(List<PlaceEntity> places) {
