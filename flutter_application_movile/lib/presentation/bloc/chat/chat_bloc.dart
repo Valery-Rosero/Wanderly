@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
@@ -148,6 +149,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       // Enriquecer lugares con datos reales (teléfono, web, dirección) usando Nominatim
       if (_lugares.isNotEmpty) {
         _lugares = await _enrichPlacesWithRealData(_lugares, event.latitude, event.longitude);
+        // Filtro final por proximidad y país
+        _lugares = _filterPlacesByProximity(_lugares, event.latitude, event.longitude);
       }
       emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
     } catch (e) {
@@ -221,19 +224,31 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     double latitude,
     double longitude,
   ) async {
+    // Restringir búsqueda a un recuadro alrededor de la posición del usuario
+    const radiusKm = 25.0; // foco local
+    final deltaLat = radiusKm / 111.0;
+    final deltaLon = radiusKm / (111.0 * math.cos(latitude * math.pi / 180.0)).abs().clamp(0.0001, 1000.0);
+    final minLat = latitude - deltaLat;
+    final maxLat = latitude + deltaLat;
+    final minLon = longitude - deltaLon;
+    final maxLon = longitude + deltaLon;
+
     final List<PlaceEntity> enriched = [];
     for (final p in basePlaces) {
       try {
         final uri = Uri.parse(
           'https://nominatim.openstreetmap.org/search?q='
           '${Uri.encodeQueryComponent(p.name)}'
-          '&format=json&limit=1&extratags=1',
+          '&format=json&limit=1&extratags=1&addressdetails=1'
+          '&countrycodes=co'
+          '&viewbox=$minLon,$minLat,$maxLon,$maxLat&bounded=1',
         );
         final response = await http.get(
           uri,
           headers: {
             'User-Agent': 'WanderlyApp/1.0 (+https://wanderly.example)',
             'Accept': 'application/json',
+            'Accept-Language': 'es',
           },
         );
         if (response.statusCode == 200) {
@@ -249,12 +264,21 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
             final String address = item['display_name']?.toString() ?? p.address;
             final double? lat = double.tryParse(item['lat']?.toString() ?? '');
             final double? lon = double.tryParse(item['lon']?.toString() ?? '');
+            // Asegurar proximidad: descartar si está demasiado lejos
+            final double finalLat = lat ?? p.latitude;
+            final double finalLon = lon ?? p.longitude;
+            final double dist = _distanceKm(latitude, longitude, finalLat, finalLon);
+            if (dist > 35) {
+              // Fuera del radio permitido: conservar original sin cambios
+              enriched.add(p);
+              continue;
+            }
             enriched.add(PlaceEntity(
               id: p.id,
               name: p.name,
               address: address,
-              latitude: lat ?? p.latitude,
-              longitude: lon ?? p.longitude,
+              latitude: finalLat,
+              longitude: finalLon,
               placeType: p.placeType,
               rating: p.rating,
               fotoUrl: p.fotoUrl,
@@ -274,6 +298,31 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       }
     }
     return enriched;
+  }
+
+  // Filtro final: quedarse con lugares cercanos y con dirección en Colombia.
+  List<PlaceEntity> _filterPlacesByProximity(
+    List<PlaceEntity> places,
+    double latitude,
+    double longitude,
+  ) {
+    return places.where((p) {
+      final dist = _distanceKm(latitude, longitude, p.latitude, p.longitude);
+      final isNear = dist <= 35; // ~35 km
+      final inColombia = (p.address.toLowerCase().contains('colombia'));
+      return isNear && inColombia;
+    }).toList();
+  }
+
+  double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
+    const double r = 6371.0; // radio de la Tierra en km
+    final dLat = (lat2 - lat1) * math.pi / 180.0;
+    final dLon = (lon2 - lon1) * math.pi / 180.0;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180.0) * math.cos(lat2 * math.pi / 180.0) *
+            math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return r * c;
   }
 
   Future<void> _onGuardarLugarFavorito(

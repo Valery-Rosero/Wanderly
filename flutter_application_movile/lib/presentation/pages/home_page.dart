@@ -282,16 +282,18 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // Siempre usar la ubicación actual del dispositivo durante la conversación.
-    if (_ubicacionActual == null) {
+    // Usar preferentemente la ubicación seleccionada manualmente; si no, la actual.
+    final hasSelected = _ubicacionSeleccionada != null;
+    final hasCurrent = _ubicacionActual != null;
+    if (!hasSelected && !hasCurrent) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se ha obtenido la ubicación actual. Autoriza ubicación e intenta nuevamente.')),
       );
       _obtenerUbicacion();
       return;
     }
-    final double lat = _ubicacionActual!.latitude;
-    final double lng = _ubicacionActual!.longitude;
+    final double lat = hasSelected ? _ubicacionSeleccionada!.latitude : _ubicacionActual!.latitude;
+    final double lng = hasSelected ? _ubicacionSeleccionada!.longitude : _ubicacionActual!.longitude;
     _chatBloc.add(SendMessageEvent(message: message, latitude: lat, longitude: lng));
   }
 
