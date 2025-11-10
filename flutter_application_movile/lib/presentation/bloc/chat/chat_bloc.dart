@@ -1,9 +1,12 @@
-import 'package:equatable/equatable.dart'; 
 import 'dart:convert';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:math' as math;
+
+import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
 import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 
 abstract class ChatState extends Equatable {
@@ -44,6 +47,16 @@ abstract class ChatEvent extends Equatable {
   List<Object> get props => [];
 }
 
+class LoadChatHistoryEvent extends ChatEvent {
+  final String usuarioId;
+  final int limit;
+
+  const LoadChatHistoryEvent({required this.usuarioId, this.limit = 200});
+
+  @override
+  List<Object> get props => [usuarioId, limit];
+}
+
 class SendMessageEvent extends ChatEvent {
   final String message;
   final double latitude;
@@ -73,12 +86,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ChatRepository _chatRepository;
   final List<ChatMessageEntity> _mensajes = [];
   List<PlaceEntity> _lugares = [];
+  final String _usuarioId;
 
-  ChatBloc({required ChatRepository chatRepository})
+  ChatBloc({required ChatRepository chatRepository, required String usuarioId})
       : _chatRepository = chatRepository,
+        _usuarioId = usuarioId,
         super(ChatInitial()) {
     on<SendMessageEvent>(_onEnviarMensaje);
     on<GuardarLugarFavoritoEvent>(_onGuardarLugarFavorito);
+    on<LoadChatHistoryEvent>(_onLoadChatHistory);
   }
 
   Future<void> _onEnviarMensaje(
@@ -92,7 +108,17 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       esUsuario: true,
       timestamp: DateTime.now(),
     ));
-    emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
+    // Persistir historial local en móvil
+    if (!kIsWeb) {
+      await _chatRepository.saveChatMessage(
+        userId: _usuarioId,
+        contenido: event.message,
+        esUsuario: true,
+        timestamp: DateTime.now(),
+      );
+    }
+    // Mostrar estado de carga mientras la IA responde
+    emit(ChatLoading());
 
     try {
       // Obtener respuesta de Gemini
@@ -102,18 +128,29 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         longitude: event.longitude,
       );
 
-      // Agregar respuesta del chatbot (texto)
+      // Agregar respuesta del chatbot (texto sin JSON visible)
+      final visibleText = _stripJsonSuffix(respuesta);
       _mensajes.add(ChatMessageEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        contenido: respuesta,
+        contenido: visibleText,
         esUsuario: false,
         timestamp: DateTime.now(),
       ));
+      if (!kIsWeb) {
+        await _chatRepository.saveChatMessage(
+          userId: _usuarioId,
+          contenido: visibleText,
+          esUsuario: false,
+          timestamp: DateTime.now(),
+        );
+      }
       // Intentar extraer places del sufijo JSON_PLACES
       _lugares = _parsePlacesFromResponse(respuesta);
       // Enriquecer lugares con datos reales (teléfono, web, dirección) usando Nominatim
       if (_lugares.isNotEmpty) {
         _lugares = await _enrichPlacesWithRealData(_lugares, event.latitude, event.longitude);
+        // Filtro final por proximidad y país
+        _lugares = _filterPlacesByProximity(_lugares, event.latitude, event.longitude);
       }
       emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
     } catch (e) {
@@ -125,6 +162,24 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       ));
       emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
   }
+  }
+
+  Future<void> _onLoadChatHistory(
+    LoadChatHistoryEvent event,
+    Emitter<ChatState> emit,
+  ) async {
+    try {
+      final history = await _chatRepository.getChatHistory(
+        userId: event.usuarioId,
+        limit: event.limit,
+      );
+      _mensajes
+        ..clear()
+        ..addAll(history);
+      emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
+    } catch (e) {
+      emit(ChatError('No se pudo cargar historial: $e'));
+    }
   }
 
   List<PlaceEntity> _parsePlacesFromResponse(String respuesta) {
@@ -143,7 +198,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         final address = p['address']?.toString() ?? '';
         final type = p['type']?.toString() ?? 'sitio';
         return PlaceEntity(
-          id: '${DateTime.now().millisecondsSinceEpoch}-${name}',
+          id: '${DateTime.now().millisecondsSinceEpoch}-$name',
           name: name,
           address: address,
           latitude: lat,
@@ -156,25 +211,44 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     }
   }
 
+  String _stripJsonSuffix(String respuesta) {
+    const marker = 'JSON_PLACES:';
+    final idx = respuesta.lastIndexOf(marker);
+    if (idx == -1) return respuesta;
+    return respuesta.substring(0, idx).trim();
+  }
+
   /// Consulta Nominatim para obtener datos reales de contacto y dirección.
   Future<List<PlaceEntity>> _enrichPlacesWithRealData(
     List<PlaceEntity> basePlaces,
     double latitude,
     double longitude,
   ) async {
+    // Restringir búsqueda a un recuadro alrededor de la posición del usuario
+    const radiusKm = 25.0; // foco local
+    final deltaLat = radiusKm / 111.0;
+    final deltaLon = radiusKm / (111.0 * math.cos(latitude * math.pi / 180.0)).abs().clamp(0.0001, 1000.0);
+    final minLat = latitude - deltaLat;
+    final maxLat = latitude + deltaLat;
+    final minLon = longitude - deltaLon;
+    final maxLon = longitude + deltaLon;
+
     final List<PlaceEntity> enriched = [];
     for (final p in basePlaces) {
       try {
         final uri = Uri.parse(
           'https://nominatim.openstreetmap.org/search?q='
           '${Uri.encodeQueryComponent(p.name)}'
-          '&format=json&limit=1&extratags=1',
+          '&format=json&limit=1&extratags=1&addressdetails=1'
+          '&countrycodes=co'
+          '&viewbox=$minLon,$minLat,$maxLon,$maxLat&bounded=1',
         );
         final response = await http.get(
           uri,
           headers: {
             'User-Agent': 'WanderlyApp/1.0 (+https://wanderly.example)',
             'Accept': 'application/json',
+            'Accept-Language': 'es',
           },
         );
         if (response.statusCode == 200) {
@@ -190,12 +264,21 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
             final String address = item['display_name']?.toString() ?? p.address;
             final double? lat = double.tryParse(item['lat']?.toString() ?? '');
             final double? lon = double.tryParse(item['lon']?.toString() ?? '');
+            // Asegurar proximidad: descartar si está demasiado lejos
+            final double finalLat = lat ?? p.latitude;
+            final double finalLon = lon ?? p.longitude;
+            final double dist = _distanceKm(latitude, longitude, finalLat, finalLon);
+            if (dist > 35) {
+              // Fuera del radio permitido: conservar original sin cambios
+              enriched.add(p);
+              continue;
+            }
             enriched.add(PlaceEntity(
               id: p.id,
               name: p.name,
               address: address,
-              latitude: lat ?? p.latitude,
-              longitude: lon ?? p.longitude,
+              latitude: finalLat,
+              longitude: finalLon,
               placeType: p.placeType,
               rating: p.rating,
               fotoUrl: p.fotoUrl,
@@ -215,6 +298,31 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       }
     }
     return enriched;
+  }
+
+  // Filtro final: quedarse con lugares cercanos y con dirección en Colombia.
+  List<PlaceEntity> _filterPlacesByProximity(
+    List<PlaceEntity> places,
+    double latitude,
+    double longitude,
+  ) {
+    return places.where((p) {
+      final dist = _distanceKm(latitude, longitude, p.latitude, p.longitude);
+      final isNear = dist <= 35; // ~35 km
+      final inColombia = (p.address.toLowerCase().contains('colombia'));
+      return isNear && inColombia;
+    }).toList();
+  }
+
+  double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
+    const double r = 6371.0; // radio de la Tierra en km
+    final dLat = (lat2 - lat1) * math.pi / 180.0;
+    final dLon = (lon2 - lon1) * math.pi / 180.0;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180.0) * math.cos(lat2 * math.pi / 180.0) *
+            math.sin(dLon / 2) * math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return r * c;
   }
 
   Future<void> _onGuardarLugarFavorito(

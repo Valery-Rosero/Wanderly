@@ -12,7 +12,7 @@ class AppDatabase {
     final dbPath = p.join(docsDir.path, 'wanderly.db');
     _db = await openDatabase(
       dbPath,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE favorites (
@@ -58,7 +58,41 @@ class AppDatabase {
             retry_count INTEGER NOT NULL DEFAULT 0
           );
         ''');
+
+        await db.execute('''
+          CREATE TABLE chat_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            contenido TEXT NOT NULL,
+            es_usuario INTEGER NOT NULL,
+            timestamp INTEGER NOT NULL,
+            place_type TEXT,
+            places_json TEXT
+          );
+        ''');
+
+        await db.execute('''
+          CREATE INDEX idx_chat_user_time ON chat_history(user_id, timestamp DESC);
+        ''');
       },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS chat_history (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id TEXT NOT NULL,
+              contenido TEXT NOT NULL,
+              es_usuario INTEGER NOT NULL,
+              timestamp INTEGER NOT NULL,
+              place_type TEXT,
+              places_json TEXT
+            );
+          ''');
+          await db.execute('''
+            CREATE INDEX IF NOT EXISTS idx_chat_user_time ON chat_history(user_id, timestamp DESC);
+          ''');
+        }
+      }
     );
     return _db!;
   }

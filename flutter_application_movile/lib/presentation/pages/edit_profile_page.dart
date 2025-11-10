@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_movile/data/constants/colombia_cities.dart';
+import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
-import 'package:flutter_application_movile/data/constants/colombia_cities.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -133,7 +133,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _ciudadSeleccionada,
+              initialValue: _ciudadSeleccionada,
               items: colombiaCities
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),

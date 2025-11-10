@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 
 class AppTheme {
   // 🎨 Colores base (constantes de uso global)

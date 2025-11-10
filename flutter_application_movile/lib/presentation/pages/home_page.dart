@@ -1,28 +1,31 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_application_movile/core/theme/app_theme.dart';
+import 'package:flutter_application_movile/data/datasources/local/chat_history_local_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/routing_remote_data_source.dart';
+import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
+import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
+import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
+import 'package:flutter_application_movile/presentation/pages/favorites_page.dart';
+import 'package:flutter_application_movile/presentation/pages/history_page.dart';
+import 'package:flutter_application_movile/presentation/pages/map_full_page.dart';
+import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
+import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
+import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
+import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:async';
-
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
-import 'package:flutter_application_movile/data/datasources/local/location_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
-import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
-import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
-import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
-import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
-import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
-import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
-import 'package:flutter_application_movile/presentation/pages/favorites_page.dart';
-import 'package:flutter_application_movile/presentation/pages/map_full_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,6 +36,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late ChatBloc _chatBloc;
+  late ChatRepository _chatRepo;
   Position? _ubicacionActual;
   latlng.LatLng? _ubicacionSeleccionada;
   bool _ubicacionCargando = false;
@@ -43,6 +47,8 @@ class _HomePageState extends State<HomePage> {
   String? _errorBusqueda;
   bool _mapVisible = true;
   final MapController _mapController = MapController();
+  final RoutingRemoteDataSource _routing = RoutingRemoteDataSource();
+  List<latlng.LatLng> _routePoints = [];
 
   @override
   void initState() {
@@ -62,20 +68,28 @@ class _HomePageState extends State<HomePage> {
         print('✅ Usuario autenticado: ${authState.user.id}');
         // En web no inicializamos SQLite
         final favoritesLocal = kIsWeb ? null : await FavoritesLocalDataSource.create();
+        final historyLocal = kIsWeb ? null : await ChatHistoryLocalDataSource.create();
         
-        _chatBloc = ChatBloc(
-          chatRepository: ChatRepositoryImpl(
+        _chatRepo = ChatRepositoryImpl(
             geminiDataSource: GeminiRemoteDataSource(),
             lugaresDataSource: PlacesRemoteDataSource(Supabase.instance.client),
             favoritesLocal: favoritesLocal,
+            historyLocal: historyLocal,
             usuarioId: authState.user.id,
-          ),
+          );
+        _chatBloc = ChatBloc(
+          chatRepository: _chatRepo,
+          usuarioId: authState.user.id,
         );
         
         print('🎉 ChatBloc inicializado exitosamente');
         setState(() {
           _chatInicializado = true;
         });
+        // Cargar historial de chat (móvil)
+        if (!kIsWeb) {
+          _chatBloc.add(LoadChatHistoryEvent(usuarioId: authState.user.id));
+        }
       } else {
         print('❌ Usuario no autenticado en _inicializarChat');
       }
@@ -151,6 +165,7 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _ubicacionActual = position;
         _ubicacionCargando = false;
+        _errorUbicacion = null;
       });
 
       // Auto-center map on user location with high precision
@@ -267,9 +282,18 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // Enviar message usando ubicación seleccionada (manual o automática).
-    final double lat = _ubicacionSeleccionada?.latitude ?? _ubicacionActual?.latitude ?? 0.0;
-    final double lng = _ubicacionSeleccionada?.longitude ?? _ubicacionActual?.longitude ?? 0.0;
+    // Usar preferentemente la ubicación seleccionada manualmente; si no, la actual.
+    final hasSelected = _ubicacionSeleccionada != null;
+    final hasCurrent = _ubicacionActual != null;
+    if (!hasSelected && !hasCurrent) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se ha obtenido la ubicación actual. Autoriza ubicación e intenta nuevamente.')),
+      );
+      _obtenerUbicacion();
+      return;
+    }
+    final double lat = hasSelected ? _ubicacionSeleccionada!.latitude : _ubicacionActual!.latitude;
+    final double lng = hasSelected ? _ubicacionSeleccionada!.longitude : _ubicacionActual!.longitude;
     _chatBloc.add(SendMessageEvent(message: message, latitude: lat, longitude: lng));
   }
 
@@ -314,73 +338,9 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.person),
-              tooltip: 'Perfil',
-              onPressed: () async {
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.favorite),
-              tooltip: 'Favoritos',
-              onPressed: () async {
-                final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage()));
-                if (result is Map && result['centerOn'] is Map) {
-                  final c = result['centerOn'] as Map;
-                  final lat = (c['lat'] as num).toDouble();
-                  final lon = (c['lon'] as num).toDouble();
-                  _mapController.move(latlng.LatLng(lat, lon), 16.0);
-                }
-              },
-            ),
-            IconButton(
-              icon: Icon(_mapVisible ? Icons.visibility : Icons.visibility_off),
-              tooltip: _mapVisible ? 'Ocultar mapa' : 'Mostrar mapa',
-              onPressed: () {
-                setState(() {
-                  _mapVisible = !_mapVisible;
-                });
-              },
-            ),
-            if (_ubicacionCargando)
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              )
-            else if (_ubicacionActual != null)
-              IconButton(
-                icon: const Icon(Icons.location_on, color: Colors.green),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Ubicación: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, '
-                        '${_ubicacionActual!.longitude.toStringAsFixed(4)}',
-                      ),
-                    ),
-                  );
-                },
-                tooltip: 'Ubicación obtenida',
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.location_off, color: Colors.red),
-                onPressed: _obtenerUbicacion,
-                tooltip: 'Permitir ubicación',
-              ),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: _cerrarSesion,
-              tooltip: 'Cerrar Sesión',
-            ),
-          ],
+          actions: const [],
         ),
+        drawer: _buildMainDrawer(),
         body: _buildBody(),
       ),
     );
@@ -424,7 +384,7 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Column(
       children: [
-        if (_errorUbicacion != null)
+        if (_errorUbicacion != null && _ubicacionActual == null)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -455,28 +415,44 @@ class _HomePageState extends State<HomePage> {
             builder: (context, state) {
               print('💬 ChatBloc State: ${state.runtimeType}');
               
-              if (state is ChatLoaded) {
-                print('💬 Mensajes en chat: ${state.messages.length}');
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  reverse: false,
-                  itemCount: state.messages.length,
-                  itemBuilder: (context, index) {
-                    final message = state.messages[index];
-                    return AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 250),
-                      switchInCurve: Curves.easeOut,
-                      switchOutCurve: Curves.easeIn,
-                      child: KeyedSubtree(
-                        key: ValueKey(message.id),
-                        child: MensajeChatWidget(
-                          message: message,
-                          onPlaceTap: _centerOnPlace,
-                          places: state.places,
+              if (state is ChatLoading) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 12),
+                      Text('La IA está respondiendo…'),
+                    ],
+                  ),
+                );
+              } else if (state is ChatLoaded && state.places.isNotEmpty) {
+                // Hacer scroll conjunto: texto del bot + lugares
+                final String? botText = _extraerUltimoMensajeBot(state.messages);
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (botText != null && botText.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Text(
+                                botText,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      const SizedBox(height: 8),
+                      _buildPlacesList(state.places),
+                    ],
+                  ),
                 );
               }
               else if (state is ChatError) {
@@ -488,10 +464,12 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 16),
                       ElevatedButton(
                         onPressed: () {
+                          final lat = _ubicacionActual?.latitude ?? 0.0;
+                          final lon = _ubicacionActual?.longitude ?? 0.0;
                           _chatBloc.add(SendMessageEvent(
                             message: 'Hola',
-                            latitude: 0.0,
-                            longitude: 0.0,
+                            latitude: lat,
+                            longitude: lon,
                           ));
                         },
                         child: const Text('Reintentar Chat'),
@@ -505,70 +483,208 @@ class _HomePageState extends State<HomePage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.chat_bubble_rounded, size: 50, color: Colors.grey),
-                      SizedBox(height: 16),
-                      Text('Bienvenido a Wanderly!'),
-                      SizedBox(height: 8),
-                      Text('Pregúntame sobre lugares interesantes', 
-                           style: TextStyle(fontSize: 14, color: Colors.grey)),
+                      SizedBox(height: 12),
+                      Text('Escribe a la IA para obtener recomendaciones'),
                     ],
                   ),
                 );
               }
               
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Cargando chat...'),
-                  ],
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+        // Se elimina el mapa del Home; sólo se mostrará al tocar un lugar.
+        SafeArea(
+          top: false,
+          child: BlocBuilder<ChatBloc, ChatState>(
+            builder: (context, state) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                      ? MediaQuery.of(context).viewInsets.bottom
+                      : 8,
+                ),
+                child: InputChatWidget(
+                  onEnviarMensaje: _enviarMensaje,
+                  estaCargando: state is ChatLoading,
+                  onUsarUbicacion: _obtenerUbicacion,
                 ),
               );
             },
           ),
         ),
-        // Barra de búsqueda y mapa (se muestra sólo si _mapVisible)
-        if (_mapVisible)
-          BlocBuilder<ChatBloc, ChatState>(
-            builder: (context, state) {
-              final places = state is ChatLoaded ? state.places : <PlaceEntity>[];
-              return _buildMap(places);
-            },
-          ),
-        if (_ubicacionSeleccionada != null || _ubicacionActual != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
-                  ],
-                ),
-                child: Text(
-                  'Lat: ${(_ubicacionSeleccionada?.latitude ?? _ubicacionActual!.latitude).toStringAsFixed(5)} · Lng: ${(_ubicacionSeleccionada?.longitude ?? _ubicacionActual!.longitude).toStringAsFixed(5)}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ),
-            ),
-          ),
-        BlocBuilder<ChatBloc, ChatState>(
-          builder: (context, state) {
-            return InputChatWidget(
-              onEnviarMensaje: _enviarMensaje,
-              estaCargando: state is ChatLoading,
-              onUsarUbicacion: _obtenerUbicacion,
-            );
-          },
-        ),
       ],
     ),
   );
+  }
+
+  Widget _buildPlacesList(List<PlaceEntity> places) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemBuilder: (context, index) {
+        final p = places[index];
+        return ListTile(
+          leading: const Icon(Icons.place, color: Colors.deepPurple),
+          title: Text(p.name),
+          subtitle: Text(p.address ?? 'Sin dirección'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Agregar a favoritos',
+                icon: const Icon(Icons.favorite_border, color: Colors.pinkAccent),
+                onPressed: () {
+                  if (_chatInicializado) {
+                    _chatBloc.add(GuardarLugarFavoritoEvent(p));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Lugar agregado a favoritos')),
+                    );
+                  }
+                },
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+          onTap: () => _openMapForPlace(p, places),
+        );
+      },
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemCount: places.length,
+    );
+  }
+
+  void _openMapForPlace(PlaceEntity place, List<PlaceEntity> places) async {
+    final userLoc = _ubicacionActual != null
+        ? latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude)
+        : null;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapFullPage(
+          center: latlng.LatLng(place.latitude, place.longitude),
+          places: places,
+          userLocation: userLoc,
+          selectedPlace: place,
+        ),
+      ),
+    );
+  }
+
+  String? _extraerUltimoMensajeBot(List<ChatMessageEntity> mensajes) {
+    for (int i = mensajes.length - 1; i >= 0; i--) {
+      final m = mensajes[i];
+      if (m.esUsuario == false && (m.contenido.isNotEmpty)) {
+        return m.contenido;
+      }
+    }
+    return null;
+  }
+
+  Drawer _buildMainDrawer() {
+    final authState = context.read<AuthBloc>().state;
+    final userName = authState is AuthAuthenticated ? (authState.user.name ?? authState.user.email) : 'Invitado';
+    final hasLocation = _ubicacionActual != null;
+
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(gradient: AppTheme.accentGradient),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Text('Wanderly', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text(userName, style: const TextStyle(color: Colors.white70)),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Perfil'),
+              onTap: () async {
+                Navigator.pop(context);
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.favorite),
+              title: const Text('Favoritos'),
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage()));
+                if (result is Map && result['centerOn'] is Map) {
+                  final c = result['centerOn'] as Map;
+                  final lat = (c['lat'] as num).toDouble();
+                  final lon = (c['lon'] as num).toDouble();
+                  _mapController.move(latlng.LatLng(lat, lon), 16.0);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history),
+              title: const Text('Historial'),
+              onTap: () async {
+                Navigator.pop(context);
+                final uid = (context.read<AuthBloc>().state as AuthAuthenticated).user.id;
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HistoryPage(chatRepository: _chatRepo, usuarioId: uid),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            SwitchListTile(
+              value: _mapVisible,
+              secondary: const Icon(Icons.map),
+              title: const Text('Mostrar mapa'),
+              onChanged: (v) {
+                setState(() {
+                  _mapVisible = v;
+                });
+              },
+            ),
+            ListTile(
+              leading: Icon(hasLocation ? Icons.location_on : Icons.location_off, color: hasLocation ? Colors.green : Colors.red),
+              title: Text(hasLocation
+                  ? 'Ubicación actual: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, ${_ubicacionActual!.longitude.toStringAsFixed(4)}'
+                  : 'Permitir ubicación'),
+              onTap: () {
+                Navigator.pop(context);
+                if (!hasLocation) {
+                  _obtenerUbicacion();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Ubicación: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, ${_ubicacionActual!.longitude.toStringAsFixed(4)}',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+            const Spacer(),
+            ListTile(
+              leading: const Icon(Icons.logout),
+              title: const Text('Cerrar sesión'),
+              onTap: () {
+                Navigator.pop(context);
+                _cerrarSesion();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildMap(List<PlaceEntity> places) {
@@ -752,6 +868,16 @@ class _HomePageState extends State<HomePage> {
                     maxNativeZoom: 19,
                     zoomOffset: 0,
                   ),
+                  if (_routePoints.isNotEmpty)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: _routePoints,
+                          strokeWidth: 4,
+                          color: Colors.deepPurple,
+                        ),
+                      ],
+                    ),
                   MarkerLayer(markers: markers),
                 ],
               ),
@@ -915,13 +1041,43 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 8),
+                    if (_routePoints.isNotEmpty)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              setState(() {
+                                _routePoints = [];
+                              });
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Icon(Icons.clear, size: 20),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1014,7 +1170,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Method to smoothly center map on a specific place
-  void _centerOnPlace(PlaceEntity place) {
+  void _centerOnPlace(PlaceEntity place) async {
     final placeLocation = latlng.LatLng(place.latitude, place.longitude);
     
     // Smooth animation to center on the place
@@ -1024,6 +1180,25 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _ubicacionSeleccionada = placeLocation;
     });
+
+    // Draw route from current location if available
+    try {
+      if (_ubicacionActual != null) {
+        final points = await _routing.getRoute(
+          startLat: _ubicacionActual!.latitude,
+          startLon: _ubicacionActual!.longitude,
+          endLat: place.latitude,
+          endLon: place.longitude,
+        );
+        setState(() {
+          _routePoints = points
+              .map((p) => latlng.LatLng(p[0], p[1]))
+              .toList();
+        });
+      }
+    } catch (e) {
+      print('⚠️ Error fetching route: $e');
+    }
     
     // Show a snackbar with place information
     ScaffoldMessenger.of(context).showSnackBar(

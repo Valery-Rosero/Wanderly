@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'package:sqflite/sqflite.dart';
+
 import 'package:flutter_application_movile/data/datasources/local/sqlite_database.dart';
 import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:sqflite/sqflite.dart';
 
 class FavoritesLocalDataSource {
   final Database _db;
@@ -81,7 +82,7 @@ class FavoritesLocalDataSource {
 
   Future<int> deleteFavorite(String userId, PlaceEntity place) async {
     // Try delete by remote_id if available, otherwise match by fields
-    if (place.id != null && !(place.id!.startsWith('local_'))) {
+    if (!(place.id.startsWith('local_'))) {
       return await _db.delete(
         'favorites',
         where: 'user_id = ? AND remote_id = ?',

@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_application_movile/data/constants/colombia_cities.dart';
 import 'package:flutter_application_movile/data/datasources/local/profile_local_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/usuarios_remote_data_source.dart';
-import 'package:flutter_application_movile/data/constants/colombia_cities.dart';
+import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -202,7 +202,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               const SizedBox(height: 12),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
-                                value: _ciudadSeleccionada,
+                                initialValue: _ciudadSeleccionada,
                                 items: _ciudades
                                     .map((c) => DropdownMenuItem<String>(
                                           value: c,

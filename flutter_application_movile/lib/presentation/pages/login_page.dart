@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_application_movile/core/theme/app_theme.dart';
 import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
-import 'package:flutter_application_movile/presentation/pages/register_page.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class LoginPage extends StatelessWidget {
   final TextEditingController emailController = TextEditingController();

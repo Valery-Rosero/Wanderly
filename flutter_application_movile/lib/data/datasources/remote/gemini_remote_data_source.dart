@@ -1,5 +1,6 @@
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:async';
+
+import 'package:google_generative_ai/google_generative_ai.dart';
 
 class GeminiRemoteDataSource {
   final GenerativeModel _model;
@@ -78,7 +79,7 @@ Qué llevar o tener en cuenta
 
 REGLAS:
 
-✅ Solo menciona lugares reales o plausibles dentro de la ciudad o sus alrededores.
+✅ Solo menciona lugares reales o plausibles dentro de la ciudad de pasto o sus alrededores.
 
 ❌ No inventes lugares.
 
@@ -87,6 +88,13 @@ REGLAS:
 ✅ Usa un tono cálido, útil y fluido.
 
 ❌ No uses formato especial, efectos ni emojis innecesarios.
+
+RESTRICCIONES GEOGRÁFICAS ESTRICTAS:
+- El país del usuario es Colombia; no recomiendes lugares fuera de Colombia.
+- La ciudad es san juan de pasto en el departamento de nariño.
+- Limita tus recomendaciones a un radio de 50 km desde las coordenadas dadas.
+- Si no hay suficientes opciones dentro de 50 km, puedes ampliar hasta 80 km, pero siempre en Colombia y mencionando que están más lejos.
+- Identifica la ciudad más cercana a las coordenadas y usa ese nombre (por ejemplo, Pasto si corresponde); evita asumir ciudades lejanas si la distancia supera 40 km.
 
 ESTRUCTURA ADICIONAL PARA MAPA:
 Al final de tu respuesta, agrega UNA línea que comience exactamente con:
