@@ -36,7 +36,7 @@ class AuthRepositoryImpl implements AuthRepository {
       if (existingUser == null) {
         await _supabase.from('users').insert({
           'id': user.id,
-          'email': email,
+          // Removed 'email' to avoid column-not-found error
           'first_name': name,
         });
       }
@@ -123,7 +123,13 @@ class AuthRepositoryImpl implements AuthRepository {
             .maybeSingle();
 
         if (response != null) {
-          return UserModel.fromJson(response).toEntity();
+          // Build entity using row data + fallback to auth email
+          return UserEntity(
+            id: response['id'] as String? ?? user.id,
+            email: user.email ?? '',
+            name: response['first_name'] as String? ?? (user.userMetadata?['full_name'] as String?),
+            createdAt: DateTime.now(),
+          );
         } else {
           return UserEntity(
             id: user.id,
