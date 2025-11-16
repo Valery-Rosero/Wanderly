@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
 import 'package:flutter_application_movile/core/theme/app_theme.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_application_movile/domain/entities/place_entity.dart';
 import 'package:flutter_application_movile/data/datasources/remote/routing_remote_data_source.dart';
 
 class MapFullPage extends StatefulWidget {
@@ -72,41 +72,47 @@ class _MapFullPageState extends State<MapFullPage> {
             gradient: AppTheme.accentGradient,
             shape: BoxShape.circle,
             boxShadow: [
-              BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 12, spreadRadius: 2),
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.3),
+                blurRadius: 12,
+                spreadRadius: 2,
+              ),
             ],
             border: Border.all(color: Colors.white, width: 3),
           ),
           child: const Icon(Icons.place, color: Colors.white, size: 24),
         ),
       ),
-      ...widget.places.map((place) => Marker(
-            point: latlng.LatLng(place.latitude, place.longitude),
-            width: 45,
-            height: 45,
-            child: Tooltip(
-              message: place.name,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.deepPurple.shade400, Colors.purple.shade600],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.purple.withOpacity(0.4),
-                      blurRadius: 8,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                  border: Border.all(color: Colors.white, width: 2),
+      ...widget.places.map(
+        (place) => Marker(
+          point: latlng.LatLng(place.latitude, place.longitude),
+          width: 45,
+          height: 45,
+          child: Tooltip(
+            message: place.name,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.deepPurple.shade400, Colors.purple.shade600],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                child: const Icon(Icons.place, color: Colors.white, size: 22),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purple.withOpacity(0.4),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+                border: Border.all(color: Colors.white, width: 2),
               ),
+              child: const Icon(Icons.place, color: Colors.white, size: 22),
             ),
-          )),
+          ),
+        ),
+      ),
     ];
 
     return Scaffold(
@@ -131,11 +137,14 @@ class _MapFullPageState extends State<MapFullPage> {
               initialZoom: 15.0,
               minZoom: 3.0,
               maxZoom: 18.0,
-              interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all,
+              ),
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate:
+                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                 subdomains: const ['a', 'b', 'c'],
                 userAgentPackageName: 'com.wanderly.app',
                 maxZoom: 19,
@@ -146,7 +155,11 @@ class _MapFullPageState extends State<MapFullPage> {
               if (_routePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
-                    Polyline(points: _routePoints, strokeWidth: 4, color: Colors.deepPurple),
+                    Polyline(
+                      points: _routePoints,
+                      strokeWidth: 4,
+                      color: Colors.deepPurple,
+                    ),
                   ],
                 ),
               MarkerLayer(markers: markers),

@@ -1,4 +1,4 @@
-import 'package:flutter_application_movile/domain/entities/usuario_entity.dart';
+import 'package:flutter_application_movile/domain/entities/user_entity.dart';
 
 abstract class AuthRepository {
   Future<void> signUpWithEmail({

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_movile/data/constants/colombia_cities.dart';
+import 'package:flutter_application_movile/data/constants/cities.dart';
 import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,10 +12,10 @@ class EditProfilePage extends StatefulWidget {
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
-  final TextEditingController _nombreController = TextEditingController();
-  final TextEditingController _apellidoController = TextEditingController();
-  String? _ciudadSeleccionada;
-  bool _guardando = false;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _lastnameController = TextEditingController();
+  String? _selectedCity;
+  bool _toSave = false;
 
   @override
   void initState() {
@@ -29,23 +29,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final fullName = authState.user.name?.trim() ?? '';
       if (fullName.isNotEmpty) {
         final parts = fullName.split(RegExp(r'\s+'));
-        _nombreController.text = parts.isNotEmpty ? parts.first : '';
-        _apellidoController.text = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+        _nameController.text = parts.isNotEmpty ? parts.first : '';
+        _lastnameController.text = parts.length > 1
+            ? parts.sublist(1).join(' ')
+            : '';
       }
     }
 
     final user = Supabase.instance.client.auth.currentUser;
-    final ciudadMeta = user?.userMetadata?['ciudad'] as String?;
-    if (ciudadMeta != null && ciudadMeta.isNotEmpty) {
-      _ciudadSeleccionada = ciudadMeta;
+    final cityMeta = user?.userMetadata?['city'] as String?;
+    if (cityMeta != null && cityMeta.isNotEmpty) {
+      _selectedCity = cityMeta;
       setState(() {});
     }
   }
 
   Future<void> _guardarCambios() async {
-    final name = _nombreController.text.trim();
-    final apellido = _apellidoController.text.trim();
-    final ciudad = _ciudadSeleccionada;
+    final name = _nameController.text.trim();
+    final apellido = _lastnameController.text.trim();
+    final ciudad = _selectedCity;
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -54,7 +56,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return;
     }
 
-    setState(() { _guardando = true; });
+    setState(() {
+      _toSave = true;
+    });
 
     try {
       final fullName = apellido.isNotEmpty ? '$name $apellido' : name;
@@ -64,19 +68,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
         throw Exception('No hay usuario autenticado');
       }
 
-      // Actualizar tabla usuarios (name)
+      // Actualizar tabla users (first_name)
       await client
-          .from('usuarios')
-          .update({'nombre': fullName})
+          .from('users')
+          .update({'first_name': fullName})
           .eq('id', user.id);
 
-      // Actualizar metadata del user (name y ciudad)
+      // Actualizar metadata del user (full_name y city)
       await client.auth.updateUser(
         UserAttributes(
-          data: {
-            'nombre': fullName,
-            if (ciudad != null) 'ciudad': ciudad,
-          },
+          data: {'full_name': fullName, if (ciudad != null) 'city': ciudad},
         ),
       );
 
@@ -84,9 +85,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       context.read<AuthBloc>().add(CheckAuthStatus());
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil actualizado')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Perfil actualizado')));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -94,7 +95,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         SnackBar(content: Text('Error al guardar: ${e.toString()}')),
       );
     } finally {
-      if (mounted) setState(() { _guardando = false; });
+      if (mounted)
+        setState(() {
+          _toSave = false;
+        });
     }
   }
 
@@ -105,10 +109,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
         title: const Text('Editar Perfil'),
         actions: [
           IconButton(
-            onPressed: _guardando ? null : _guardarCambios,
+            onPressed: _toSave ? null : _guardarCambios,
             icon: const Icon(Icons.save),
             tooltip: 'Guardar cambios',
-          )
+          ),
         ],
       ),
       body: Padding(
@@ -117,7 +121,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
-              controller: _nombreController,
+              controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'Nombre',
                 border: OutlineInputBorder(),
@@ -125,7 +129,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: _apellidoController,
+              controller: _lastnameController,
               decoration: const InputDecoration(
                 labelText: 'Apellido',
                 border: OutlineInputBorder(),
@@ -133,11 +137,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              initialValue: _ciudadSeleccionada,
-              items: colombiaCities
+              initialValue: _selectedCity,
+              items: cities
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
-              onChanged: (val) => setState(() => _ciudadSeleccionada = val),
+              onChanged: (val) => setState(() => _selectedCity = val),
               decoration: const InputDecoration(
                 labelText: 'Ciudad de origen',
                 border: OutlineInputBorder(),
@@ -148,12 +152,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _guardando ? null : _guardarCambios,
-                icon: _guardando
+                onPressed: _toSave ? null : _guardarCambios,
+                icon: _toSave
                     ? const SizedBox(
-                        width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.save),
-                label: Text(_guardando ? 'Guardando...' : 'Guardar'),
+                label: Text(_toSave ? 'Guardando...' : 'Guardar'),
               ),
             ),
           ],

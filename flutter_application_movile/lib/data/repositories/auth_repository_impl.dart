@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_application_movile/domain/entities/usuario_entity.dart';
+import 'package:flutter_application_movile/domain/entities/user_entity.dart';
 import 'package:flutter_application_movile/domain/repositories/auth_repository.dart';
-import 'package:flutter_application_movile/data/models/usuario_model.dart';
+import 'package:flutter_application_movile/data/models/user_model.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final SupabaseClient _supabase;
@@ -18,7 +18,7 @@ class AuthRepositoryImpl implements AuthRepository {
       final AuthResponse response = await _supabase.auth.signUp(
         email: email,
         password: password,
-        data: {'nombre': name},
+        data: {'full_name': name},
       );
 
       final user = response.user;
@@ -28,23 +28,23 @@ class AuthRepositoryImpl implements AuthRepository {
 
       // Verificar si el user ya existe en la tabla
       final existingUser = await _supabase
-          .from('usuarios')
+          .from('users')
           .select()
           .eq('id', user.id)
           .maybeSingle();
 
       if (existingUser == null) {
-        await _supabase.from('usuarios').insert({
+        await _supabase.from('users').insert({
           'id': user.id,
           'email': email,
-          'nombre': name,
-          'created_at': DateTime.now().toIso8601String(),
+          'first_name': name,
         });
       }
     } on AuthException catch (e) {
       // Specific auth error handling with clear, user-friendly messages
       final msg = e.message ?? '';
-      if (msg.contains('User already registered') || msg.contains('already registered')) {
+      if (msg.contains('User already registered') ||
+          msg.contains('already registered')) {
         throw Exception('This email is already in use. Please log in instead.');
       } else if (msg.contains('Email not confirmed')) {
         throw Exception('Please confirm your email to complete registration.');
@@ -103,7 +103,7 @@ class AuthRepositoryImpl implements AuthRepository {
         return UserEntity(
           id: user.id,
           email: user.email ?? '',
-          name: user.userMetadata?['nombre'] as String?,
+          name: user.userMetadata?['full_name'] as String?,
           createdAt: DateTime.now(),
         );
       }
@@ -117,19 +117,18 @@ class AuthRepositoryImpl implements AuthRepository {
       final user = _supabase.auth.currentUser;
       if (user != null) {
         final response = await _supabase
-            .from('usuarios')
+            .from('users')
             .select()
             .eq('id', user.id)
             .maybeSingle();
 
         if (response != null) {
-          return UsuarioModel.fromJson(response).toEntity();
+          return UserModel.fromJson(response).toEntity();
         } else {
-          // Si no existe en la tabla, crear entidad básica
           return UserEntity(
             id: user.id,
             email: user.email ?? '',
-            name: user.userMetadata?['nombre'] as String?,
+            name: user.userMetadata?['full_name'] as String?,
             createdAt: DateTime.now(),
           );
         }

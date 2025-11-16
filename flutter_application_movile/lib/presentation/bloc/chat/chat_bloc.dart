@@ -3,8 +3,8 @@ import 'dart:math' as math;
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
-import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
+import 'package:flutter_application_movile/domain/entities/place_entity.dart';
+import 'package:flutter_application_movile/domain/entities/chat_message_entity.dart';
 import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
@@ -48,13 +48,13 @@ abstract class ChatEvent extends Equatable {
 }
 
 class LoadChatHistoryEvent extends ChatEvent {
-  final String usuarioId;
+  final String userId;
   final int limit;
 
-  const LoadChatHistoryEvent({required this.usuarioId, this.limit = 200});
+  const LoadChatHistoryEvent({required this.userId, this.limit = 200});
 
   @override
-  List<Object> get props => [usuarioId, limit];
+  List<Object> get props => [userId, limit];
 }
 
 class SendMessageEvent extends ChatEvent {
@@ -72,10 +72,10 @@ class SendMessageEvent extends ChatEvent {
   List<Object> get props => [message, latitude, longitude];
 }
 
-class GuardarLugarFavoritoEvent extends ChatEvent {
+class SaveFavoritePlaceEvent extends ChatEvent {
   final PlaceEntity place;
 
-  const GuardarLugarFavoritoEvent(this.place);
+  const SaveFavoritePlaceEvent(this.place);
 
   @override
   List<Object> get props => [place];
@@ -85,15 +85,15 @@ class GuardarLugarFavoritoEvent extends ChatEvent {
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ChatRepository _chatRepository;
   final List<ChatMessageEntity> _mensajes = [];
-  List<PlaceEntity> _lugares = [];
-  final String _usuarioId;
+  List<PlaceEntity> _places = [];
+  final String _userId;
 
-  ChatBloc({required ChatRepository chatRepository, required String usuarioId})
-      : _chatRepository = chatRepository,
-        _usuarioId = usuarioId,
-        super(ChatInitial()) {
+  ChatBloc({required ChatRepository chatRepository, required String userId})
+    : _chatRepository = chatRepository,
+      _userId = userId,
+      super(ChatInitial()) {
     on<SendMessageEvent>(_onEnviarMensaje);
-    on<GuardarLugarFavoritoEvent>(_onGuardarLugarFavorito);
+    on<SaveFavoritePlaceEvent>(_onGuardarLugarFavorito);
     on<LoadChatHistoryEvent>(_onLoadChatHistory);
   }
 
@@ -102,18 +102,20 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     Emitter<ChatState> emit,
   ) async {
     // Agregar message del user
-    _mensajes.add(ChatMessageEntity(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      contenido: event.message,
-      esUsuario: true,
-      timestamp: DateTime.now(),
-    ));
+    _mensajes.add(
+      ChatMessageEntity(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content: event.message,
+        isUser: true,
+        timestamp: DateTime.now(),
+      ),
+    );
     // Persistir historial local en móvil
     if (!kIsWeb) {
       await _chatRepository.saveChatMessage(
-        userId: _usuarioId,
-        contenido: event.message,
-        esUsuario: true,
+        userId: _userId,
+        content: event.message,
+        isUser: true,
         timestamp: DateTime.now(),
       );
     }
@@ -121,47 +123,57 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     emit(ChatLoading());
 
     try {
-      // Obtener respuesta de Gemini
       final respuesta = await _chatRepository.sendMessage(
         message: event.message,
         latitude: event.latitude,
         longitude: event.longitude,
       );
 
-      // Agregar respuesta del chatbot (texto sin JSON visible)
       final visibleText = _stripJsonSuffix(respuesta);
-      _mensajes.add(ChatMessageEntity(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        contenido: visibleText,
-        esUsuario: false,
-        timestamp: DateTime.now(),
-      ));
+      _mensajes.add(
+        ChatMessageEntity(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          content: visibleText,
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
       if (!kIsWeb) {
         await _chatRepository.saveChatMessage(
-          userId: _usuarioId,
-          contenido: visibleText,
-          esUsuario: false,
+          userId: _userId,
+          content: visibleText,
+          isUser: false,
           timestamp: DateTime.now(),
         );
       }
       // Intentar extraer places del sufijo JSON_PLACES
-      _lugares = _parsePlacesFromResponse(respuesta);
+      _places = _parsePlacesFromResponse(respuesta);
       // Enriquecer lugares con datos reales (teléfono, web, dirección) usando Nominatim
-      if (_lugares.isNotEmpty) {
-        _lugares = await _enrichPlacesWithRealData(_lugares, event.latitude, event.longitude);
+      if (_places.isNotEmpty) {
+        _places = await _enrichPlacesWithRealData(
+          _places,
+          event.latitude,
+          event.longitude,
+        );
         // Filtro final por proximidad y país
-        _lugares = _filterPlacesByProximity(_lugares, event.latitude, event.longitude);
+        _places = _filterPlacesByProximity(
+          _places,
+          event.latitude,
+          event.longitude,
+        );
       }
-      emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
+      emit(ChatLoaded(List.from(_mensajes), places: List.from(_places)));
     } catch (e) {
-      _mensajes.add(ChatMessageEntity(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        contenido: 'Error: $e',
-        esUsuario: false,
-        timestamp: DateTime.now(),
-      ));
-      emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
-  }
+      _mensajes.add(
+        ChatMessageEntity(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          content: 'Error: $e',
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
+      emit(ChatLoaded(List.from(_mensajes), places: List.from(_places)));
+    }
   }
 
   Future<void> _onLoadChatHistory(
@@ -170,13 +182,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) async {
     try {
       final history = await _chatRepository.getChatHistory(
-        userId: event.usuarioId,
+        userId: event.userId,
         limit: event.limit,
       );
       _mensajes
         ..clear()
         ..addAll(history);
-      emit(ChatLoaded(List.from(_mensajes), places: List.from(_lugares)));
+      emit(ChatLoaded(List.from(_mensajes), places: List.from(_places)));
     } catch (e) {
       emit(ChatError('No se pudo cargar historial: $e'));
     }
@@ -193,8 +205,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       if (places == null) return [];
       return places.map((p) {
         final name = p['name']?.toString() ?? 'Lugar';
-        final lat = (p['lat'] is num) ? (p['lat'] as num).toDouble() : double.tryParse('${p['lat']}') ?? 0.0;
-        final lng = (p['lng'] is num) ? (p['lng'] as num).toDouble() : double.tryParse('${p['lng']}') ?? 0.0;
+        final lat = (p['lat'] is num)
+            ? (p['lat'] as num).toDouble()
+            : double.tryParse('${p['lat']}') ?? 0.0;
+        final lng = (p['lng'] is num)
+            ? (p['lng'] as num).toDouble()
+            : double.tryParse('${p['lng']}') ?? 0.0;
         final address = p['address']?.toString() ?? '';
         final type = p['type']?.toString() ?? 'sitio';
         return PlaceEntity(
@@ -227,7 +243,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     // Restringir búsqueda a un recuadro alrededor de la posición del usuario
     const radiusKm = 25.0; // foco local
     final deltaLat = radiusKm / 111.0;
-    final deltaLon = radiusKm / (111.0 * math.cos(latitude * math.pi / 180.0)).abs().clamp(0.0001, 1000.0);
+    final deltaLon =
+        radiusKm /
+        (111.0 * math.cos(latitude * math.pi / 180.0)).abs().clamp(
+          0.0001,
+          1000.0,
+        );
     final minLat = latitude - deltaLat;
     final maxLat = latitude + deltaLat;
     final minLon = longitude - deltaLon;
@@ -252,41 +273,54 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           },
         );
         if (response.statusCode == 200) {
-          final List<dynamic> data = json.decode(response.body) as List<dynamic>;
+          final List<dynamic> data =
+              json.decode(response.body) as List<dynamic>;
           if (data.isNotEmpty) {
             final item = data.first as Map<String, dynamic>;
             final Map<String, dynamic> extratags =
                 (item['extratags'] as Map<String, dynamic>?) ?? {};
-            final String? phone = (extratags['phone'] ?? extratags['contact:phone'])?.toString();
-            final String? website = (extratags['website'] ?? extratags['contact:website'])?.toString();
-            final String? instagram = extratags['contact:instagram']?.toString();
+            final String? phone =
+                (extratags['phone'] ?? extratags['contact:phone'])?.toString();
+            final String? website =
+                (extratags['website'] ?? extratags['contact:website'])
+                    ?.toString();
+            final String? instagram = extratags['contact:instagram']
+                ?.toString();
             final String? facebook = extratags['contact:facebook']?.toString();
-            final String address = item['display_name']?.toString() ?? p.address;
+            final String address =
+                item['display_name']?.toString() ?? p.address;
             final double? lat = double.tryParse(item['lat']?.toString() ?? '');
             final double? lon = double.tryParse(item['lon']?.toString() ?? '');
             // Asegurar proximidad: descartar si está demasiado lejos
             final double finalLat = lat ?? p.latitude;
             final double finalLon = lon ?? p.longitude;
-            final double dist = _distanceKm(latitude, longitude, finalLat, finalLon);
+            final double dist = _distanceKm(
+              latitude,
+              longitude,
+              finalLat,
+              finalLon,
+            );
             if (dist > 35) {
               // Fuera del radio permitido: conservar original sin cambios
               enriched.add(p);
               continue;
             }
-            enriched.add(PlaceEntity(
-              id: p.id,
-              name: p.name,
-              address: address,
-              latitude: finalLat,
-              longitude: finalLon,
-              placeType: p.placeType,
-              rating: p.rating,
-              fotoUrl: p.fotoUrl,
-              phone: phone,
-              website: website,
-              instagram: instagram,
-              facebook: facebook,
-            ));
+            enriched.add(
+              PlaceEntity(
+                id: p.id,
+                name: p.name,
+                address: address,
+                latitude: finalLat,
+                longitude: finalLon,
+                placeType: p.placeType,
+                rating: p.rating,
+                fotoUrl: p.fotoUrl,
+                phone: phone,
+                website: website,
+                instagram: instagram,
+                facebook: facebook,
+              ),
+            );
           } else {
             enriched.add(p);
           }
@@ -308,9 +342,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) {
     return places.where((p) {
       final dist = _distanceKm(latitude, longitude, p.latitude, p.longitude);
-      final isNear = dist <= 35; // ~35 km
-      final inColombia = (p.address.toLowerCase().contains('colombia'));
-      return isNear && inColombia;
+      final isNear = dist <= 50; // más permisivo, alineado al prompt
+      return isNear;
     }).toList();
   }
 
@@ -318,15 +351,18 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     const double r = 6371.0; // radio de la Tierra en km
     final dLat = (lat2 - lat1) * math.pi / 180.0;
     final dLon = (lon2 - lon1) * math.pi / 180.0;
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(lat1 * math.pi / 180.0) * math.cos(lat2 * math.pi / 180.0) *
-            math.sin(dLon / 2) * math.sin(dLon / 2);
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180.0) *
+            math.cos(lat2 * math.pi / 180.0) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return r * c;
   }
 
   Future<void> _onGuardarLugarFavorito(
-    GuardarLugarFavoritoEvent event,
+    SaveFavoritePlaceEvent event,
     Emitter<ChatState> emit,
   ) async {
     try {

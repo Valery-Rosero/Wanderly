@@ -14,8 +14,8 @@ abstract class ChatRepository {
   // Chat history (local only)
   Future<void> saveChatMessage({
     required String userId,
-    required String contenido,
-    required bool esUsuario,
+    required String content,
+    required bool isUser,
     required DateTime timestamp,
     String? placeType,
   });

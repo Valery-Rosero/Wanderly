@@ -1,35 +1,35 @@
-import 'package:flutter_application_movile/domain/entities/usuario_entity.dart';
+import 'package:flutter_application_movile/domain/entities/user_entity.dart';
 
-class UsuarioModel {
+class UserModel {
   final String id;
   final String email;
   final String? name;
-  final String? fotoPerfil;
+  final String? profilePicture;
   final DateTime createdAt;
 
-  UsuarioModel({
+  UserModel({
     required this.id,
     required this.email,
     this.name,
-    this.fotoPerfil,
+    this.profilePicture,
     required this.createdAt,
   });
 
-  factory UsuarioModel.fromJson(Map<String, dynamic> json) {
+  factory UserModel.fromJson(Map<String, dynamic> json) {
     final id = json['id'] as String? ?? '';
     final email = json['email'] as String? ?? '';
-    final name = json['nombre'] as String?;
-    final fotoPerfil = json['foto_perfil'] as String?;
+    final name = json['first_name'] as String?;
+    final profilePicture = json['profile_picture'] as String?;
     final createdRaw = json['created_at'];
     final createdAt = (createdRaw is String && createdRaw.isNotEmpty)
         ? (DateTime.tryParse(createdRaw) ?? DateTime.now())
         : DateTime.now();
 
-    return UsuarioModel(
+    return UserModel(
       id: id,
       email: email,
       name: name,
-      fotoPerfil: fotoPerfil,
+      profilePicture: profilePicture,
       createdAt: createdAt,
     );
   }
@@ -38,8 +38,8 @@ class UsuarioModel {
     return {
       'id': id,
       'email': email,
-      'nombre': name,
-      'foto_perfil': fotoPerfil,
+      'first_name': name,
+      'profile_picture': profilePicture,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -49,7 +49,7 @@ class UsuarioModel {
       id: id,
       email: email,
       name: name,
-      fotoPerfil: fotoPerfil,
+      profilePicture: profilePicture,
       createdAt: createdAt,
     );
   }

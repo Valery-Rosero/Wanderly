@@ -2,14 +2,14 @@ class UserEntity {
   final String id;
   final String email;
   final String? name;
-  final String? fotoPerfil;
+  final String? profilePicture;
   final DateTime createdAt;
-//viva petro
+  //viva petro
   UserEntity({
     required this.id,
     required this.email,
     this.name,
-    this.fotoPerfil,
+    this.profilePicture,
     required this.createdAt,
   });
 }

@@ -1,5 +1,5 @@
 /// Lista de ciudades de Colombia (capitales departamentales y principales)
-const List<String> colombiaCities = [
+const List<String> cities = [
   'Arauca',
   'Armenia',
   'Barranquilla',

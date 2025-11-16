@@ -7,10 +7,10 @@ import 'package:flutter_application_movile/data/datasources/local/chat_history_l
 import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/lugares_remote_data_source.dart';
+import 'package:flutter_application_movile/data/datasources/remote/places_remote_data_source.dart';
 import 'package:flutter_application_movile/data/datasources/remote/routing_remote_data_source.dart';
 import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_application_movile/domain/entities/place_entity.dart';
 import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
 import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
@@ -19,8 +19,8 @@ import 'package:flutter_application_movile/presentation/pages/history_page.dart'
 import 'package:flutter_application_movile/presentation/pages/map_full_page.dart';
 import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
 import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
-import 'package:flutter_application_movile/presentation/widgets/mensaje_chat_widget.dart';
-import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
+import 'package:flutter_application_movile/presentation/widgets/chat_message_widget.dart';
+import 'package:flutter_application_movile/domain/entities/chat_message_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -39,12 +39,12 @@ class _HomePageState extends State<HomePage> {
   late ChatRepository _chatRepo;
   Position? _ubicacionActual;
   latlng.LatLng? _ubicacionSeleccionada;
-  bool _ubicacionCargando = false;
+  bool _loadingLocation = false;
   String? _errorUbicacion;
   bool _chatInicializado = false;
   final TextEditingController _buscarCtrl = TextEditingController();
   bool _buscandoDireccion = false;
-  String? _errorBusqueda;
+  String? _errorSearch;
   bool _mapVisible = true;
   final MapController _mapController = MapController();
   final RoutingRemoteDataSource _routing = RoutingRemoteDataSource();
@@ -63,32 +63,36 @@ class _HomePageState extends State<HomePage> {
     try {
       print('🔧 Inicializando ChatBloc...');
       final authState = context.read<AuthBloc>().state;
-      
+
       if (authState is AuthAuthenticated) {
         print('✅ Usuario autenticado: ${authState.user.id}');
         // En web no inicializamos SQLite
-        final favoritesLocal = kIsWeb ? null : await FavoritesLocalDataSource.create();
-        final historyLocal = kIsWeb ? null : await ChatHistoryLocalDataSource.create();
-        
+        final favoritesLocal = kIsWeb
+            ? null
+            : await FavoritesLocalDataSource.create();
+        final historyLocal = kIsWeb
+            ? null
+            : await ChatHistoryLocalDataSource.create();
+
         _chatRepo = ChatRepositoryImpl(
-            geminiDataSource: GeminiRemoteDataSource(),
-            lugaresDataSource: PlacesRemoteDataSource(Supabase.instance.client),
-            favoritesLocal: favoritesLocal,
-            historyLocal: historyLocal,
-            usuarioId: authState.user.id,
-          );
+          geminiDataSource: GeminiRemoteDataSource(),
+          placesDataSource: PlacesRemoteDataSource(Supabase.instance.client),
+          favoritesLocal: favoritesLocal,
+          historyLocal: historyLocal,
+          userId: authState.user.id,
+        );
         _chatBloc = ChatBloc(
           chatRepository: _chatRepo,
-          usuarioId: authState.user.id,
+          userId: authState.user.id,
         );
-        
+
         print('🎉 ChatBloc inicializado exitosamente');
         setState(() {
           _chatInicializado = true;
         });
         // Cargar historial de chat (móvil)
         if (!kIsWeb) {
-          _chatBloc.add(LoadChatHistoryEvent(usuarioId: authState.user.id));
+          _chatBloc.add(LoadChatHistoryEvent(userId: authState.user.id));
         }
       } else {
         print('❌ Usuario no autenticado en _inicializarChat');
@@ -100,7 +104,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _obtenerUbicacion() async {
     setState(() {
-      _ubicacionCargando = true;
+      _loadingLocation = true;
       _errorUbicacion = null;
     });
 
@@ -109,8 +113,9 @@ class _HomePageState extends State<HomePage> {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         setState(() {
-          _errorUbicacion = 'Los servicios de ubicación están deshabilitados. Por favor, actívalos para una mejor experiencia.';
-          _ubicacionCargando = false;
+          _errorUbicacion =
+              'Los servicios de ubicación están deshabilitados. Por favor, actívalos para una mejor experiencia.';
+          _loadingLocation = false;
         });
         return;
       }
@@ -121,8 +126,9 @@ class _HomePageState extends State<HomePage> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           setState(() {
-            _errorUbicacion = 'Para brindarte sugerencias personalizadas, necesitamos acceso a tu ubicación. Puedes habilitarlo en la configuración.';
-            _ubicacionCargando = false;
+            _errorUbicacion =
+                'Para brindarte sugerencias personalizadas, necesitamos acceso a tu ubicación. Puedes habilitarlo en la configuración.';
+            _loadingLocation = false;
           });
           return;
         }
@@ -130,8 +136,9 @@ class _HomePageState extends State<HomePage> {
 
       if (permission == LocationPermission.deniedForever) {
         setState(() {
-          _errorUbicacion = 'Los permisos de ubicación están permanentemente denegados. Por favor, habilítalos en la configuración del navegador para obtener sugerencias personalizadas.';
-          _ubicacionCargando = false;
+          _errorUbicacion =
+              'Los permisos de ubicación están permanentemente denegados. Por favor, habilítalos en la configuración del navegador para obtener sugerencias personalizadas.';
+          _loadingLocation = false;
         });
         return;
       }
@@ -144,15 +151,17 @@ class _HomePageState extends State<HomePage> {
 
       // Verify accuracy and retry if needed
       if (position.accuracy > 50) {
-        print('🎯 Precisión inicial: ${position.accuracy}m - Intentando mejorar...');
-        
+        print(
+          '🎯 Precisión inicial: ${position.accuracy}m - Intentando mejorar...',
+        );
+
         // Try to get a more accurate position
         try {
           Position betterPosition = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.best,
             timeLimit: const Duration(seconds: 10),
           );
-          
+
           if (betterPosition.accuracy < position.accuracy) {
             position = betterPosition;
             print('✅ Precisión mejorada: ${position.accuracy}m');
@@ -164,27 +173,27 @@ class _HomePageState extends State<HomePage> {
 
       setState(() {
         _ubicacionActual = position;
-        _ubicacionCargando = false;
+        _loadingLocation = false;
         _errorUbicacion = null;
       });
 
       // Auto-center map on user location with high precision
       final userLocation = latlng.LatLng(position.latitude, position.longitude);
       _mapController.move(userLocation, 16.0); // Higher zoom for precision
-      
+
       // Start continuous location tracking for better accuracy
       _startLocationTracking();
-      
+
       // Generate initial location-based suggestions
       _generateLocationBasedSuggestions(userLocation);
 
       print('📍 Ubicación obtenida con precisión: ${position.accuracy}m');
       print('📍 Coordenadas: ${position.latitude}, ${position.longitude}');
-
     } catch (e) {
       setState(() {
-        _errorUbicacion = 'No pudimos obtener tu ubicación en este momento. Puedes seleccionar manualmente un lugar en el mapa.';
-        _ubicacionCargando = false;
+        _errorUbicacion =
+            'No pudimos obtener tu ubicación en este momento. Puedes seleccionar manualmente un lugar en el mapa.';
+        _loadingLocation = false;
       });
     }
   }
@@ -194,37 +203,40 @@ class _HomePageState extends State<HomePage> {
   void _startLocationTracking() {
     // Cancel any existing subscription
     _locationSubscription?.cancel();
-    
+
     // Start continuous location tracking with high accuracy
-    _locationSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 5, // Update every 5 meters
-        timeLimit: Duration(seconds: 10),
-      ),
-    ).listen(
-      (Position position) {
-        // Only update if the new position is significantly more accurate or different
-        if (_ubicacionActual == null || 
-            position.accuracy < _ubicacionActual!.accuracy ||
-            Geolocator.distanceBetween(
-              _ubicacionActual!.latitude, 
-              _ubicacionActual!.longitude,
-              position.latitude, 
-              position.longitude
-            ) > 10) {
-          
-          setState(() {
-            _ubicacionActual = position;
-          });
-          
-          print('🔄 Ubicación actualizada - Precisión: ${position.accuracy}m');
-        }
-      },
-      onError: (error) {
-        print('❌ Error en seguimiento de ubicación: $error');
-      },
-    );
+    _locationSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 5, // Update every 5 meters
+            timeLimit: Duration(seconds: 10),
+          ),
+        ).listen(
+          (Position position) {
+            // Only update if the new position is significantly more accurate or different
+            if (_ubicacionActual == null ||
+                position.accuracy < _ubicacionActual!.accuracy ||
+                Geolocator.distanceBetween(
+                      _ubicacionActual!.latitude,
+                      _ubicacionActual!.longitude,
+                      position.latitude,
+                      position.longitude,
+                    ) >
+                    10) {
+              setState(() {
+                _ubicacionActual = position;
+              });
+
+              print(
+                '🔄 Ubicación actualizada - Precisión: ${position.accuracy}m',
+              );
+            }
+          },
+          onError: (error) {
+            print('❌ Error en seguimiento de ubicación: $error');
+          },
+        );
   }
 
   Future<void> _buscarDireccion() async {
@@ -232,7 +244,7 @@ class _HomePageState extends State<HomePage> {
     if (query.isEmpty) return;
     setState(() {
       _buscandoDireccion = true;
-      _errorBusqueda = null;
+      _errorSearch = null;
     });
 
     try {
@@ -240,7 +252,7 @@ class _HomePageState extends State<HomePage> {
       final result = await geocoder.geocodeAddress(query);
       if (result == null) {
         setState(() {
-          _errorBusqueda = 'No se encontró la dirección';
+          _errorSearch = 'No se encontró la dirección';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No se encontró la dirección')),
@@ -259,11 +271,11 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       setState(() {
-        _errorBusqueda = 'Error buscando dirección: $e';
+        _errorSearch = 'Error buscando dirección: $e';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error buscando dirección: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error buscando dirección: $e')));
     } finally {
       setState(() {
         _buscandoDireccion = false;
@@ -273,11 +285,13 @@ class _HomePageState extends State<HomePage> {
 
   void _enviarMensaje(String message) {
     print('📤 Intentando enviar mensaje: $message');
-    
+
     if (!_chatInicializado) {
       print('❌ ChatBloc no inicializado');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chat no inicializado. Intenta recargar la página.')),
+        const SnackBar(
+          content: Text('Chat no inicializado. Intenta recargar la página.'),
+        ),
       );
       return;
     }
@@ -287,14 +301,24 @@ class _HomePageState extends State<HomePage> {
     final hasCurrent = _ubicacionActual != null;
     if (!hasSelected && !hasCurrent) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se ha obtenido la ubicación actual. Autoriza ubicación e intenta nuevamente.')),
+        const SnackBar(
+          content: Text(
+            'No se ha obtenido la ubicación actual. Autoriza ubicación e intenta nuevamente.',
+          ),
+        ),
       );
       _obtenerUbicacion();
       return;
     }
-    final double lat = hasSelected ? _ubicacionSeleccionada!.latitude : _ubicacionActual!.latitude;
-    final double lng = hasSelected ? _ubicacionSeleccionada!.longitude : _ubicacionActual!.longitude;
-    _chatBloc.add(SendMessageEvent(message: message, latitude: lat, longitude: lng));
+    final double lat = hasSelected
+        ? _ubicacionSeleccionada!.latitude
+        : _ubicacionActual!.latitude;
+    final double lng = hasSelected
+        ? _ubicacionSeleccionada!.longitude
+        : _ubicacionActual!.longitude;
+    _chatBloc.add(
+      SendMessageEvent(message: message, latitude: lat, longitude: lng),
+    );
   }
 
   void _cerrarSesion() {
@@ -304,15 +328,13 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     print('🏠 HomePage build llamado - Chat inicializado: $_chatInicializado');
-    
+
     if (!_chatInicializado) {
       return _buildLoadingScreen();
     }
 
     return MultiBlocProvider(
-      providers: [
-        BlocProvider.value(value: _chatBloc),
-      ],
+      providers: [BlocProvider.value(value: _chatBloc)],
       child: Scaffold(
         appBar: AppBar(
           centerTitle: false,
@@ -331,9 +353,15 @@ class _HomePageState extends State<HomePage> {
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Wanderly', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                    'Wanderly',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   SizedBox(height: 2),
-                  Text('Tu compañero de viaje', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(
+                    'Tu compañero de viaje',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                 ],
               ),
             ],
@@ -383,140 +411,133 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       child: Column(
-      children: [
-        if (_errorUbicacion != null && _ubicacionActual == null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.orange[50],
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.location_disabled, color: Colors.orange),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _errorUbicacion!,
-                    style: const TextStyle(fontSize: 12),
+        children: [
+          if (_errorUbicacion != null && _ubicacionActual == null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_disabled, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _errorUbicacion!,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                   ),
-                ),
-                TextButton(
-                  onPressed: _obtenerUbicacion,
-                  child: const Text('Permitir ubicación'),
-                ),
-              ],
-            ),
-          ),
-        Expanded(
-          child: BlocBuilder<ChatBloc, ChatState>(
-            builder: (context, state) {
-              print('💬 ChatBloc State: ${state.runtimeType}');
-              
-              if (state is ChatLoading) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 12),
-                      Text('La IA está respondiendo…'),
-                    ],
+                  TextButton(
+                    onPressed: _obtenerUbicacion,
+                    child: const Text('Permitir ubicación'),
                   ),
-                );
-              } else if (state is ChatLoaded && state.places.isNotEmpty) {
-                // Hacer scroll conjunto: texto del bot + lugares
-                final String? botText = _extraerUltimoMensajeBot(state.messages);
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (botText != null && botText.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                          child: Card(
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Text(
-                                botText,
-                                style: const TextStyle(fontSize: 14),
+                ],
+              ),
+            ),
+          Expanded(
+            child: BlocBuilder<ChatBloc, ChatState>(
+              builder: (context, state) {
+                print('💬 ChatBloc State: ${state.runtimeType}');
+
+                if (state is ChatLoading) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 12),
+                        Text('La IA está respondiendo…'),
+                      ],
+                    ),
+                  );
+                } else if (state is ChatLoaded) {
+                  final mensajes = state.messages;
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    itemCount: mensajes.length,
+                    itemBuilder: (context, i) {
+                      final m = mensajes[i];
+                      final isLastBot = !m.isUser && i == mensajes.length - 1;
+                      return ChatMessageWidget(
+                        message: m,
+                        places: isLastBot ? state.places : const [],
+                        onPlaceTap: (place) =>
+                            _openMapForPlace(place, state.places),
+                      );
+                    },
+                  );
+                } else if (state is ChatError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Error: ${state.message}'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            final lat = _ubicacionActual?.latitude ?? 0.0;
+                            final lon = _ubicacionActual?.longitude ?? 0.0;
+                            _chatBloc.add(
+                              SendMessageEvent(
+                                message: 'Hola',
+                                latitude: lat,
+                                longitude: lon,
                               ),
-                            ),
-                          ),
+                            );
+                          },
+                          child: const Text('Reintentar Chat'),
                         ),
-                      const SizedBox(height: 8),
-                      _buildPlacesList(state.places),
-                    ],
-                  ),
-                );
-              }
-              else if (state is ChatError) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Error: ${state.message}'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          final lat = _ubicacionActual?.latitude ?? 0.0;
-                          final lon = _ubicacionActual?.longitude ?? 0.0;
-                          _chatBloc.add(SendMessageEvent(
-                            message: 'Hola',
-                            latitude: lat,
-                            longitude: lon,
-                          ));
-                        },
-                        child: const Text('Reintentar Chat'),
-                      ),
-                    ],
-                  ),
-                );
-              } else if (state is ChatInitial) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.chat_bubble_rounded, size: 50, color: Colors.grey),
-                      SizedBox(height: 12),
-                      Text('Escribe a la IA para obtener recomendaciones'),
-                    ],
-                  ),
-                );
-              }
-              
-              return const SizedBox.shrink();
-            },
+                      ],
+                    ),
+                  );
+                } else if (state is ChatInitial) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_rounded,
+                          size: 50,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 12),
+                        Text('Escribe a la IA para obtener recomendaciones'),
+                      ],
+                    ),
+                  );
+                }
+
+                return const SizedBox.shrink();
+              },
+            ),
           ),
-        ),
-        // Se elimina el mapa del Home; sólo se mostrará al tocar un lugar.
-        SafeArea(
-          top: false,
-          child: BlocBuilder<ChatBloc, ChatState>(
-            builder: (context, state) {
-              return Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom > 0
-                      ? MediaQuery.of(context).viewInsets.bottom
-                      : 8,
-                ),
-                child: InputChatWidget(
-                  onEnviarMensaje: _enviarMensaje,
-                  estaCargando: state is ChatLoading,
-                  onUsarUbicacion: _obtenerUbicacion,
-                ),
-              );
-            },
+          // Se elimina el mapa del Home; sólo se mostrará al tocar un lugar.
+          SafeArea(
+            top: false,
+            child: BlocBuilder<ChatBloc, ChatState>(
+              builder: (context, state) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                        ? MediaQuery.of(context).viewInsets.bottom
+                        : 8,
+                  ),
+                  child: InputChatWidget(
+                    onEnviarMensaje: _enviarMensaje,
+                    estaCargando: state is ChatLoading,
+                    onUsarUbicacion: _obtenerUbicacion,
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
   }
 
   Widget _buildPlacesList(List<PlaceEntity> places) {
@@ -535,12 +556,17 @@ class _HomePageState extends State<HomePage> {
             children: [
               IconButton(
                 tooltip: 'Agregar a favoritos',
-                icon: const Icon(Icons.favorite_border, color: Colors.pinkAccent),
+                icon: const Icon(
+                  Icons.favorite_border,
+                  color: Colors.pinkAccent,
+                ),
                 onPressed: () {
                   if (_chatInicializado) {
-                    _chatBloc.add(GuardarLugarFavoritoEvent(p));
+                    _chatBloc.add(SaveFavoritePlaceEvent(p));
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Lugar agregado a favoritos')),
+                      const SnackBar(
+                        content: Text('Lugar agregado a favoritos'),
+                      ),
                     );
                   }
                 },
@@ -576,8 +602,8 @@ class _HomePageState extends State<HomePage> {
   String? _extraerUltimoMensajeBot(List<ChatMessageEntity> mensajes) {
     for (int i = mensajes.length - 1; i >= 0; i--) {
       final m = mensajes[i];
-      if (m.esUsuario == false && (m.contenido.isNotEmpty)) {
-        return m.contenido;
+      if (m.isUser == false && (m.content.isNotEmpty)) {
+        return m.content;
       }
     }
     return null;
@@ -585,7 +611,9 @@ class _HomePageState extends State<HomePage> {
 
   Drawer _buildMainDrawer() {
     final authState = context.read<AuthBloc>().state;
-    final userName = authState is AuthAuthenticated ? (authState.user.name ?? authState.user.email) : 'Invitado';
+    final userName = authState is AuthAuthenticated
+        ? (authState.user.name ?? authState.user.email)
+        : 'Invitado';
     final hasLocation = _ubicacionActual != null;
 
     return Drawer(
@@ -599,7 +627,14 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  const Text('Wanderly', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Wanderly',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(userName, style: const TextStyle(color: Colors.white70)),
                 ],
@@ -610,7 +645,10 @@ class _HomePageState extends State<HomePage> {
               title: const Text('Perfil'),
               onTap: () async {
                 Navigator.pop(context);
-                await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
+                );
               },
             ),
             ListTile(
@@ -618,7 +656,10 @@ class _HomePageState extends State<HomePage> {
               title: const Text('Favoritos'),
               onTap: () async {
                 Navigator.pop(context);
-                final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const FavoritesPage()));
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FavoritesPage()),
+                );
                 if (result is Map && result['centerOn'] is Map) {
                   final c = result['centerOn'] as Map;
                   final lat = (c['lat'] as num).toDouble();
@@ -632,31 +673,31 @@ class _HomePageState extends State<HomePage> {
               title: const Text('Historial'),
               onTap: () async {
                 Navigator.pop(context);
-                final uid = (context.read<AuthBloc>().state as AuthAuthenticated).user.id;
+                final uid =
+                    (context.read<AuthBloc>().state as AuthAuthenticated)
+                        .user
+                        .id;
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => HistoryPage(chatRepository: _chatRepo, usuarioId: uid),
+                    builder: (_) =>
+                        HistoryPage(chatRepository: _chatRepo, usuarioId: uid),
                   ),
                 );
               },
             ),
             const Divider(),
-            SwitchListTile(
-              value: _mapVisible,
-              secondary: const Icon(Icons.map),
-              title: const Text('Mostrar mapa'),
-              onChanged: (v) {
-                setState(() {
-                  _mapVisible = v;
-                });
-              },
-            ),
+            // SwitchListTile removido: ya no hay botón para mostrar/ocultar mapa
             ListTile(
-              leading: Icon(hasLocation ? Icons.location_on : Icons.location_off, color: hasLocation ? Colors.green : Colors.red),
-              title: Text(hasLocation
-                  ? 'Ubicación actual: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, ${_ubicacionActual!.longitude.toStringAsFixed(4)}'
-                  : 'Permitir ubicación'),
+              leading: Icon(
+                hasLocation ? Icons.location_on : Icons.location_off,
+                color: hasLocation ? Colors.green : Colors.red,
+              ),
+              title: Text(
+                hasLocation
+                    ? 'Ubicación actual: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, ${_ubicacionActual!.longitude.toStringAsFixed(4)}'
+                    : 'Permitir ubicación',
+              ),
               onTap: () {
                 Navigator.pop(context);
                 if (!hasLocation) {
@@ -710,9 +751,10 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    final center = _ubicacionSeleccionada ??
+    final center =
+        _ubicacionSeleccionada ??
         latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude);
-    
+
     final markers = <Marker>[
       // Enhanced user location marker
       Marker(
@@ -732,19 +774,15 @@ class _HomePageState extends State<HomePage> {
             ],
             border: Border.all(color: Colors.white, width: 3),
           ),
-          child: const Icon(
-            Icons.my_location,
-            color: Colors.white,
-            size: 24,
-          ),
+          child: const Icon(Icons.my_location, color: Colors.white, size: 24),
         ),
       ),
-      
+
       // Enhanced markers for chatbot recommended places
       ...places.asMap().entries.map((entry) {
         final index = entry.key;
         final place = entry.value;
-        
+
         return Marker(
           point: latlng.LatLng(place.latitude, place.longitude),
           width: 45,
@@ -754,10 +792,7 @@ class _HomePageState extends State<HomePage> {
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Colors.deepPurple.shade400,
-                    Colors.purple.shade600,
-                  ],
+                  colors: [Colors.deepPurple.shade400, Colors.purple.shade600],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -855,7 +890,8 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   // Enhanced OpenStreetMap tile layer with better quality and caching
                   TileLayer(
-                    urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    urlTemplate:
+                        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                     subdomains: const ['a', 'b', 'c'],
                     userAgentPackageName: 'com.wanderly.app',
                     maxZoom: 19,
@@ -891,10 +927,8 @@ class _HomePageState extends State<HomePage> {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => MapFullPage(
-                            center: center,
-                            places: places,
-                          ),
+                          builder: (_) =>
+                              MapFullPage(center: center, places: places),
                         ),
                       );
                     },
@@ -917,7 +951,10 @@ class _HomePageState extends State<HomePage> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 6,
+                        ),
                       ],
                     ),
                     child: Row(
@@ -931,18 +968,24 @@ class _HomePageState extends State<HomePage> {
                               prefixIcon: Icon(Icons.search),
                               border: InputBorder.none,
                               isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 12),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 12,
+                              ),
                             ),
                             onSubmitted: (_) => _buscarDireccion(),
                           ),
                         ),
                         TextButton(
-                          onPressed: _buscandoDireccion ? null : _buscarDireccion,
+                          onPressed: _buscandoDireccion
+                              ? null
+                              : _buscarDireccion,
                           child: _buscandoDireccion
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text('Buscar'),
                         ),
@@ -990,10 +1033,7 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                           ),
-                          Container(
-                            height: 1,
-                            color: Colors.grey[300],
-                          ),
+                          Container(height: 1, color: Colors.grey[300]),
                           Material(
                             color: Colors.transparent,
                             child: InkWell(
@@ -1037,47 +1077,51 @@ class _HomePageState extends State<HomePage> {
                           onTap: _centerOnUserLocation,
                           child: const Padding(
                             padding: EdgeInsets.all(8.0),
-                            child: Icon(Icons.my_location, size: 20, color: Colors.blue),
+                            child: Icon(
+                              Icons.my_location,
+                              size: 20,
+                              color: Colors.blue,
+                            ),
                           ),
                         ),
-                      ),
-                          ),
-                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    if (_routePoints.isNotEmpty)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () {
-                              setState(() {
-                                _routePoints = [];
-                              });
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Icon(Icons.clear, size: 20),
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
+              const SizedBox(height: 8),
+              if (_routePoints.isNotEmpty)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        setState(() {
+                          _routePoints = [];
+                        });
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: Icon(Icons.clear, size: 20),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1095,7 +1139,10 @@ class _HomePageState extends State<HomePage> {
 
   void _centerOnUserLocation() {
     if (_ubicacionActual != null) {
-      final userLocation = latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude);
+      final userLocation = latlng.LatLng(
+        _ubicacionActual!.latitude,
+        _ubicacionActual!.longitude,
+      );
       _mapController.move(userLocation, 15.0);
       setState(() {
         _ubicacionSeleccionada = userLocation;
@@ -1113,17 +1160,21 @@ class _HomePageState extends State<HomePage> {
     // For now, we'll add a simple implementation that can be enhanced later
     final lat = location.latitude;
     final lng = location.longitude;
-    
+
     // For now, we'll just print the suggestion to console
     // This can be enhanced later with a proper event system for automatic suggestions
-    print('🗺️ Área explorable: ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}');
-    print('💡 Sugerencia: El usuario puede preguntar sobre restaurantes, atracciones, hoteles en esta área');
+    print(
+      '🗺️ Área explorable: ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+    );
+    print(
+      '💡 Sugerencia: El usuario puede preguntar sobre restaurantes, atracciones, hoteles en esta área',
+    );
   }
 
   // Helper method to get appropriate icon for place type
   IconData _getPlaceIcon(String? tipo) {
     if (tipo == null) return Icons.place;
-    
+
     switch (tipo.toLowerCase()) {
       case 'restaurant':
       case 'restaurante':
@@ -1172,10 +1223,10 @@ class _HomePageState extends State<HomePage> {
   // Method to smoothly center map on a specific place
   void _centerOnPlace(PlaceEntity place) async {
     final placeLocation = latlng.LatLng(place.latitude, place.longitude);
-    
+
     // Smooth animation to center on the place
     _mapController.move(placeLocation, 17.0);
-    
+
     // Update selected location
     setState(() {
       _ubicacionSeleccionada = placeLocation;
@@ -1191,25 +1242,19 @@ class _HomePageState extends State<HomePage> {
           endLon: place.longitude,
         );
         setState(() {
-          _routePoints = points
-              .map((p) => latlng.LatLng(p[0], p[1]))
-              .toList();
+          _routePoints = points.map((p) => latlng.LatLng(p[0], p[1])).toList();
         });
       }
     } catch (e) {
       print('⚠️ Error fetching route: $e');
     }
-    
+
     // Show a snackbar with place information
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            Icon(
-              _getPlaceIcon(place.placeType),
-              color: Colors.white,
-              size: 20,
-            ),
+            Icon(_getPlaceIcon(place.placeType), color: Colors.white, size: 20),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -1237,14 +1282,13 @@ class _HomePageState extends State<HomePage> {
         ),
         backgroundColor: Colors.deepPurple.shade600,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 3),
       ),
     );
-    
-    print('🎯 Centrado en: ${place.name} (${place.latitude}, ${place.longitude})');
-  }
 
+    print(
+      '🎯 Centrado en: ${place.name} (${place.latitude}, ${place.longitude})',
+    );
+  }
 }

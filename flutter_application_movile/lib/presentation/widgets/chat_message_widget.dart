@@ -6,31 +6,35 @@ import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class MensajeChatWidget extends StatefulWidget {
+class ChatMessageWidget extends StatefulWidget {
   final ChatMessageEntity message;
   final Function(PlaceEntity)? onPlaceTap;
   final List<PlaceEntity>? places;
 
-  const MensajeChatWidget({
-    super.key, 
+  const ChatMessageWidget({
+    super.key,
     required this.message,
     this.onPlaceTap,
     this.places,
   });
 
   @override
-  State<MensajeChatWidget> createState() => _MensajeChatWidgetState();
+  State<ChatMessageWidget> createState() => _MensajeChatWidgetState();
 }
 
-class _MensajeChatWidgetState extends State<MensajeChatWidget> {
+class _MensajeChatWidgetState extends State<ChatMessageWidget> {
   // Track recently-saved places to show a transient animated check
   final Set<String> _recentlySaved = <String>{};
 
   @override
   Widget build(BuildContext context) {
-    final isUser = widget.message.esUsuario;
-    final bubbleColor = isUser ? Colors.white : Theme.of(context).colorScheme.primary.withOpacity(0.10);
-    final labelColor = isUser ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.primary;
+    final isUser = widget.message.isUser;
+    final bubbleColor = isUser
+        ? Colors.white
+        : Theme.of(context).colorScheme.primary.withOpacity(0.10);
+    final labelColor = isUser
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.primary;
 
     final bubble = ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 600),
@@ -39,7 +43,9 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: BorderRadius.circular(16),
-          border: isUser ? Border.all(color: Colors.grey.shade200) : Border.all(color: Colors.deepPurple.shade100),
+          border: isUser
+              ? Border.all(color: Colors.grey.shade200)
+              : Border.all(color: Colors.deepPurple.shade100),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -53,7 +59,10 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
           children: [
             if (widget.message.placeType != null) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: labelColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(12),
@@ -71,15 +80,22 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
             ],
             // Texto del mensaje con formato simple de negrilla (**texto**)
             SelectableText.rich(
-              TextSpan(children: _buildFormattedSpans(widget.message.contenido, Theme.of(context).textTheme.bodyLarge!)),
+              TextSpan(
+                children: _buildFormattedSpans(
+                  widget.message.content,
+                  Theme.of(context).textTheme.bodyLarge!,
+                ),
+              ),
               textAlign: TextAlign.left,
             ),
 
             // Acciones rápidas para teléfonos y enlaces presentes en el contenido
-            ..._buildQuickActions(widget.message.contenido),
-            
+            ..._buildQuickActions(widget.message.content),
+
             // Enhanced place recommendations with tap-to-center functionality
-            if (!isUser && widget.places != null && widget.places!.isNotEmpty) ...[
+            if (!isUser &&
+                widget.places != null &&
+                widget.places!.isNotEmpty) ...[
               const SizedBox(height: 12),
               const Divider(height: 1),
               const SizedBox(height: 8),
@@ -95,7 +111,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
               ...widget.places!.asMap().entries.map((entry) {
                 final index = entry.key;
                 final place = entry.value;
-                
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 6),
                   child: Material(
@@ -146,7 +162,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                
+
                                 // Place icon
                                 Icon(
                                   _getPlaceIcon(place.placeType),
@@ -154,11 +170,12 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                   size: 18,
                                 ),
                                 const SizedBox(width: 8),
-                                
+
                                 // Place details
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         place.name,
@@ -182,7 +199,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                     ],
                                   ),
                                 ),
-                                
+
                                 // Actions: center on map and save favorite
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -193,61 +210,104 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                         Icons.location_on,
                                         color: Colors.deepPurple.shade400,
                                       ),
-                                      onPressed: () => widget.onPlaceTap?.call(place),
+                                      onPressed: () =>
+                                          widget.onPlaceTap?.call(place),
                                     ),
-                                    if (place.phone != null && place.phone!.isNotEmpty) ...[
+                                    if (place.phone != null &&
+                                        place.phone!.isNotEmpty) ...[
                                       IconButton(
                                         tooltip: 'Llamar',
-                                        icon: const Icon(Icons.phone, color: Colors.green),
+                                        icon: const Icon(
+                                          Icons.phone,
+                                          color: Colors.green,
+                                        ),
                                         onPressed: () {
-                                          final tel = place.phone!.replaceAll(' ', '').replaceAll('-', '');
+                                          final tel = place.phone!
+                                              .replaceAll(' ', '')
+                                              .replaceAll('-', '');
                                           launchUrl(Uri.parse('tel:$tel'));
                                         },
                                       ),
                                       IconButton(
                                         tooltip: 'Copiar número',
-                                        icon: const Icon(Icons.copy, color: Colors.black87),
+                                        icon: const Icon(
+                                          Icons.copy,
+                                          color: Colors.black87,
+                                        ),
                                         onPressed: () async {
-                                          await Clipboard.setData(ClipboardData(text: place.phone!));
+                                          await Clipboard.setData(
+                                            ClipboardData(text: place.phone!),
+                                          );
                                           if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Número copiado al portapapeles')),
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Número copiado al portapapeles',
+                                                ),
+                                              ),
                                             );
                                           }
                                         },
                                       ),
                                     ],
-                                    if (place.website != null && place.website!.isNotEmpty)
+                                    if (place.website != null &&
+                                        place.website!.isNotEmpty)
                                       IconButton(
                                         tooltip: 'Abrir sitio web',
-                                        icon: const Icon(Icons.open_in_new, color: Colors.blue),
+                                        icon: const Icon(
+                                          Icons.open_in_new,
+                                          color: Colors.blue,
+                                        ),
                                         onPressed: () {
                                           final url = place.website!;
-                                          final uri = Uri.parse(url.startsWith('http') ? url : 'https://$url');
-                                          launchUrl(uri, mode: LaunchMode.externalApplication);
+                                          final uri = Uri.parse(
+                                            url.startsWith('http')
+                                                ? url
+                                                : 'https://$url',
+                                          );
+                                          launchUrl(
+                                            uri,
+                                            mode:
+                                                LaunchMode.externalApplication,
+                                          );
                                         },
                                       ),
                                     IconButton(
                                       tooltip: 'Guardar favorito',
                                       icon: AnimatedSwitcher(
-                                        duration: const Duration(milliseconds: 200),
+                                        duration: const Duration(
+                                          milliseconds: 200,
+                                        ),
                                         child: _recentlySaved.contains(place.id)
-                                            ? const Icon(Icons.favorite, key: ValueKey('fav'), color: Colors.pinkAccent)
-                                            : const Icon(Icons.favorite_border, key: ValueKey('unfav'), color: Colors.pinkAccent),
+                                            ? const Icon(
+                                                Icons.favorite,
+                                                key: ValueKey('fav'),
+                                                color: Colors.pinkAccent,
+                                              )
+                                            : const Icon(
+                                                Icons.favorite_border,
+                                                key: ValueKey('unfav'),
+                                                color: Colors.pinkAccent,
+                                              ),
                                       ),
                                       onPressed: () {
                                         final bloc = context.read<ChatBloc>();
-                                        bloc.add(GuardarLugarFavoritoEvent(place));
+                                        bloc.add(SaveFavoritePlaceEvent(place));
                                         // Show animated check overlay
                                         setState(() {
                                           _recentlySaved.add(place.id);
                                         });
-                                        Future.delayed(const Duration(milliseconds: 1200), () {
-                                          if (!mounted) return;
-                                          setState(() {
-                                            _recentlySaved.remove(place.id);
-                                          });
-                                        });
+                                        Future.delayed(
+                                          const Duration(milliseconds: 1200),
+                                          () {
+                                            if (!mounted) return;
+                                            setState(() {
+                                              _recentlySaved.remove(place.id);
+                                            });
+                                          },
+                                        );
                                       },
                                     ),
                                   ],
@@ -261,9 +321,13 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                             top: 8,
                             child: AnimatedOpacity(
                               duration: const Duration(milliseconds: 250),
-                              opacity: _recentlySaved.contains(place.id) ? 1 : 0,
+                              opacity: _recentlySaved.contains(place.id)
+                                  ? 1
+                                  : 0,
                               child: AnimatedScale(
-                                scale: _recentlySaved.contains(place.id) ? 1 : 0.8,
+                                scale: _recentlySaved.contains(place.id)
+                                    ? 1
+                                    : 0.8,
                                 duration: const Duration(milliseconds: 250),
                                 curve: Curves.easeOutBack,
                                 child: Container(
@@ -281,7 +345,11 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                                     ],
                                   ),
                                   child: const Center(
-                                    child: Icon(Icons.check, color: Colors.white, size: 16),
+                                    child: Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -293,7 +361,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                   ),
                 );
               }),
-              
+
               // Helpful hint
               Container(
                 margin: const EdgeInsets.only(top: 4),
@@ -328,26 +396,31 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
     );
 
     final avatar = CircleAvatar(
-      backgroundColor: isUser ? Colors.grey.shade300 : Theme.of(context).colorScheme.primary,
-      child: Icon(isUser ? Icons.person : Icons.smart_toy, color: isUser ? Colors.white : Colors.white),
+      backgroundColor: isUser
+          ? Colors.grey.shade300
+          : Theme.of(context).colorScheme.primary,
+      child: Icon(
+        isUser ? Icons.person : Icons.smart_toy,
+        color: isUser ? Colors.white : Colors.white,
+      ),
     );
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: isUser
             ? [
-                Expanded(child: Align(alignment: Alignment.centerRight, child: bubble)),
+                Expanded(
+                  child: Align(alignment: Alignment.centerRight, child: bubble),
+                ),
                 const SizedBox(width: 12),
                 avatar,
               ]
-            : [
-                avatar,
-                const SizedBox(width: 12),
-                Expanded(child: bubble),
-              ],
+            : [avatar, const SizedBox(width: 12), Expanded(child: bubble)],
       ),
     );
   }
@@ -369,33 +442,41 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
         if (urlMatch != null) {
           final urlText = urlMatch.group(0)!;
           // Render azul subrayado para indicar enlace; acciones se ofrecen vía chips.
-          spans.add(TextSpan(
-            text: urlText,
-            style: baseStyle.copyWith(
-              color: Colors.blue,
-              decoration: TextDecoration.underline,
-              fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight,
+          spans.add(
+            TextSpan(
+              text: urlText,
+              style: baseStyle.copyWith(
+                color: Colors.blue,
+                decoration: TextDecoration.underline,
+                fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight,
+              ),
             ),
-          ));
+          );
           index = urlMatch.end;
         } else if (phoneMatch != null) {
           final phoneText = phoneMatch.group(0)!.trim();
           // Render azul subrayado para indicar teléfono; acciones se ofrecen vía chips.
-          spans.add(TextSpan(
-            text: phoneText,
-            style: baseStyle.copyWith(
-              color: Colors.blue,
-              decoration: TextDecoration.underline,
-              fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight,
+          spans.add(
+            TextSpan(
+              text: phoneText,
+              style: baseStyle.copyWith(
+                color: Colors.blue,
+                decoration: TextDecoration.underline,
+                fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight,
+              ),
             ),
-          ));
+          );
           index = phoneMatch.end;
         } else {
           // Texto normal
-          spans.add(TextSpan(
-            text: segment[index],
-            style: baseStyle.copyWith(fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight),
-          ));
+          spans.add(
+            TextSpan(
+              text: segment[index],
+              style: baseStyle.copyWith(
+                fontWeight: bold ? FontWeight.w700 : baseStyle.fontWeight,
+              ),
+            ),
+          );
           index++;
         }
       }
@@ -417,24 +498,31 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
     final phoneRegex = RegExp(r'(\+?[0-9][0-9\s\-]{6,}[0-9])');
 
     final urls = urlRegex.allMatches(text).map((m) => m.group(0)!).toList();
-    final phones = phoneRegex.allMatches(text).map((m) => m.group(0)!.trim()).toList();
+    final phones = phoneRegex
+        .allMatches(text)
+        .map((m) => m.group(0)!.trim())
+        .toList();
 
     final widgets = <Widget>[];
 
     if (phones.isNotEmpty || urls.isNotEmpty) {
       widgets.add(const SizedBox(height: 8));
-      widgets.add(Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          ...phones.map((p) => Row(
+      widgets.add(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ...phones.map(
+              (p) => Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ActionChip(
                     label: Text('Llamar $p'),
                     avatar: const Icon(Icons.phone, size: 16),
                     onPressed: () {
-                      final uri = Uri.parse('tel:${p.replaceAll(' ', '').replaceAll('-', '')}');
+                      final uri = Uri.parse(
+                        'tel:${p.replaceAll(' ', '').replaceAll('-', '')}',
+                      );
                       launchUrl(uri);
                     },
                   ),
@@ -445,22 +533,28 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
                       await Clipboard.setData(ClipboardData(text: p));
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Número copiado al portapapeles')),
+                          const SnackBar(
+                            content: Text('Número copiado al portapapeles'),
+                          ),
                         );
                       }
                     },
                   ),
                 ],
-              )),
-          ...urls.map((u) => ActionChip(
+              ),
+            ),
+            ...urls.map(
+              (u) => ActionChip(
                 label: const Text('Abrir enlace'),
                 avatar: const Icon(Icons.link, size: 16),
                 onPressed: () {
                   launchUrl(Uri.parse(u), mode: LaunchMode.externalApplication);
                 },
-              )),
-        ],
-      ));
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return widgets;
@@ -469,7 +563,7 @@ class _MensajeChatWidgetState extends State<MensajeChatWidget> {
   // Helper method to get appropriate icon for place type
   IconData _getPlaceIcon(String? tipo) {
     if (tipo == null) return Icons.place;
-    
+
     switch (tipo.toLowerCase()) {
       case 'restaurant':
       case 'restaurante':

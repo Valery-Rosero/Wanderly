@@ -19,11 +19,11 @@ class AppDatabase {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
             remote_id TEXT,
-            nombre TEXT NOT NULL,
-            direccion TEXT,
+            name TEXT NOT NULL,
+            address TEXT,
             lat REAL NOT NULL,
             lon REAL NOT NULL,
-            tipo TEXT,
+            type TEXT,
             created_at INTEGER NOT NULL,
             synced INTEGER NOT NULL DEFAULT 0
           );
@@ -37,9 +37,9 @@ class AppDatabase {
           CREATE TABLE user_profile (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT UNIQUE NOT NULL,
-            nombre TEXT,
-            apellido TEXT,
-            ubicacion_base TEXT,
+            name TEXT,
+            last_name TEXT,
+            location_base TEXT,
             base_lat REAL,
             base_lon REAL,
             updated_at INTEGER NOT NULL,
@@ -63,8 +63,8 @@ class AppDatabase {
           CREATE TABLE chat_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
-            contenido TEXT NOT NULL,
-            es_usuario INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            is_user INTEGER NOT NULL,
             timestamp INTEGER NOT NULL,
             place_type TEXT,
             places_json TEXT
@@ -81,8 +81,8 @@ class AppDatabase {
             CREATE TABLE IF NOT EXISTS chat_history (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               user_id TEXT NOT NULL,
-              contenido TEXT NOT NULL,
-              es_usuario INTEGER NOT NULL,
+              content TEXT NOT NULL,
+              is_user INTEGER NOT NULL,
               timestamp INTEGER NOT NULL,
               place_type TEXT,
               places_json TEXT
@@ -92,7 +92,7 @@ class AppDatabase {
             CREATE INDEX IF NOT EXISTS idx_chat_user_time ON chat_history(user_id, timestamp DESC);
           ''');
         }
-      }
+      },
     );
     return _db!;
   }

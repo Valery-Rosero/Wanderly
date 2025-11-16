@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_application_movile/data/datasources/local/sqlite_database.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
+import 'package:flutter_application_movile/domain/entities/place_entity.dart';
 import 'package:sqflite/sqflite.dart';
 
 class FavoritesLocalDataSource {
@@ -16,21 +16,17 @@ class FavoritesLocalDataSource {
 
   Future<int> saveFavorite(String userId, PlaceEntity place) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    return await _db.insert(
-      'favorites',
-      {
-        'user_id': userId,
-        'remote_id': place.id,
-        'nombre': place.name,
-        'direccion': place.address,
-        'lat': place.latitude,
-        'lon': place.longitude,
-        'tipo': place.placeType,
-        'created_at': now,
-        'synced': 0,
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    return await _db.insert('favorites', {
+      'user_id': userId,
+      'remote_id': place.id,
+      'name': place.name,
+      'address': place.address,
+      'lat': place.latitude,
+      'lon': place.longitude,
+      'type': place.placeType,
+      'created_at': now,
+      'synced': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<List<PlaceEntity>> getFavorites(String userId) async {
@@ -40,14 +36,18 @@ class FavoritesLocalDataSource {
       whereArgs: [userId],
       orderBy: 'created_at DESC',
     );
-    return rows.map((r) => PlaceEntity(
-          id: (r['remote_id'] as String?) ?? 'local_${r['id']}',
-          name: r['nombre'] as String,
-          address: (r['direccion'] as String?) ?? '',
-          latitude: (r['lat'] as num).toDouble(),
-          longitude: (r['lon'] as num).toDouble(),
-          placeType: (r['tipo'] as String?) ?? '',
-        )).toList();
+    return rows
+        .map(
+          (r) => PlaceEntity(
+            id: (r['remote_id'] as String?) ?? 'local_${r['id']}',
+            name: r['name'] as String,
+            address: (r['address'] as String?) ?? '',
+            latitude: (r['lat'] as num).toDouble(),
+            longitude: (r['lon'] as num).toDouble(),
+            placeType: (r['type'] as String?) ?? '',
+          ),
+        )
+        .toList();
   }
 
   Future<void> markFavoriteSynced(int localId, String remoteId) async {
@@ -61,13 +61,13 @@ class FavoritesLocalDataSource {
 
   Future<void> enqueueSyncFavorite(String userId, PlaceEntity place) async {
     final payload = jsonEncode({
-      'usuario_id': userId,
-      'nombre_lugar': place.name,
-      'direccion': place.address,
-      'latitud': place.latitude,
-      'longitud': place.longitude,
-      'tipo_lugar': place.placeType,
-      'notas': 'Guardado desde chat',
+      'user_id': userId,
+      'place_name': place.name,
+      'address': place.address,
+      'lat': place.latitude,
+      'lon': place.longitude,
+      'place_type': place.placeType,
+      'notes': 'Guardado desde chat',
     });
     final now = DateTime.now().millisecondsSinceEpoch;
     await _db.insert('sync_outbox', {
@@ -97,10 +97,7 @@ class FavoritesLocalDataSource {
   }
 
   Future<void> enqueueSyncDeleteFavorite(String userId, String remoteId) async {
-    final payload = jsonEncode({
-      'usuario_id': userId,
-      'favorito_id': remoteId,
-    });
+    final payload = jsonEncode({'usuario_id': userId, 'favorito_id': remoteId});
     final now = DateTime.now().millisecondsSinceEpoch;
     await _db.insert('sync_outbox', {
       'entity': 'favorite',
@@ -111,11 +108,21 @@ class FavoritesLocalDataSource {
       'retry_count': 0,
     });
   }
+
   Future<List<Map<String, dynamic>>> getPendingOutbox() async {
-    return _db.query('sync_outbox', where: 'status = ?', whereArgs: ['pending']);
+    return _db.query(
+      'sync_outbox',
+      where: 'status = ?',
+      whereArgs: ['pending'],
+    );
   }
 
   Future<void> markOutboxItem(String id, {required String status}) async {
-    await _db.update('sync_outbox', {'status': status}, where: 'id = ?', whereArgs: [id]);
+    await _db.update(
+      'sync_outbox',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }
