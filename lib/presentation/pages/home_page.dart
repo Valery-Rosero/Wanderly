@@ -9,6 +9,7 @@ import 'package:wanderly/data/datasources/remote/gemini_remote_data_source.dart'
 import 'package:wanderly/data/datasources/remote/geocoding_remote_data_source.dart';
 import 'package:wanderly/data/datasources/remote/places_remote_data_source.dart';
 import 'package:wanderly/data/datasources/remote/routing_remote_data_source.dart';
+import 'package:wanderly/data/datasources/remote/chat_remote_data_source.dart';
 import 'package:wanderly/data/repositories/chat_repository_impl.dart';
 import 'package:wanderly/domain/entities/place_entity.dart';
 import 'package:wanderly/domain/repositories/chat_repository.dart';
@@ -66,6 +67,8 @@ class _HomePageState extends State<HomePage> {
 
       if (authState is AuthAuthenticated) {
         print('✅ Usuario autenticado: ${authState.user.id}');
+        final supaId = Supabase.instance.client.auth.currentUser?.id;
+        print('🔎 IDs -> AuthBloc: ${authState.user.id} | Supabase: $supaId');
         // En web no inicializamos SQLite
         final favoritesLocal = kIsWeb
             ? null
@@ -79,6 +82,7 @@ class _HomePageState extends State<HomePage> {
           placesDataSource: PlacesRemoteDataSource(Supabase.instance.client),
           favoritesLocal: favoritesLocal,
           historyLocal: historyLocal,
+          chatRemoteDataSource: ChatRemoteDataSource(Supabase.instance.client),
           userId: authState.user.id,
         );
         _chatBloc = ChatBloc(

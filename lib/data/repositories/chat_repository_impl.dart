@@ -5,6 +5,8 @@ import 'package:wanderly/data/datasources/remote/places_remote_data_source.dart'
 import 'package:wanderly/domain/entities/place_entity.dart';
 import 'package:wanderly/domain/entities/chat_message_entity.dart';
 import 'package:wanderly/domain/repositories/chat_repository.dart';
+import 'package:wanderly/data/datasources/remote/chat_remote_data_source.dart';
+import 'package:wanderly/domain/entities/chat_session_entity.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
   final GeminiRemoteDataSource _geminiDataSource;
@@ -12,6 +14,8 @@ class ChatRepositoryImpl implements ChatRepository {
   final FavoritesLocalDataSource? _favoritesLocal;
   final ChatHistoryLocalDataSource? _historyLocal;
   final String _userId;
+  final ChatRemoteDataSource? _chatRemote;
+  String? _currentSessionId;
 
   ChatRepositoryImpl({
     required GeminiRemoteDataSource geminiDataSource,
@@ -19,11 +23,13 @@ class ChatRepositoryImpl implements ChatRepository {
     FavoritesLocalDataSource? favoritesLocal,
     ChatHistoryLocalDataSource? historyLocal,
     required String userId,
+    ChatRemoteDataSource? chatRemoteDataSource,
   }) : _geminiDataSource = geminiDataSource,
        _placesDataSource = placesDataSource,
        _favoritesLocal = favoritesLocal,
        _historyLocal = historyLocal,
-       _userId = userId;
+       _userId = userId,
+       _chatRemote = chatRemoteDataSource;
 
   @override
   Future<String> sendMessage({
@@ -46,15 +52,90 @@ class ChatRepositoryImpl implements ChatRepository {
     required DateTime timestamp,
     String? placeType,
   }) async {
-    if (_historyLocal == null) return; // Web: no local storage
-    final msg = ChatMessageEntity(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      content: content,
-      isUser: isUser,
-      timestamp: timestamp,
-      placeType: placeType,
-    );
-    await _historyLocal.addMessage(userId, msg);
+    // Local (móvil) como antes
+    if (_historyLocal == null) {
+      // Web: sin local, continuamos para remoto
+    } else {
+      final msg = ChatMessageEntity(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        content: content,
+        isUser: isUser,
+        timestamp: timestamp,
+        placeType: placeType,
+      );
+      await _historyLocal.addMessage(userId, msg);
+    }
+
+    // Remoto: guardar en Supabase dentro de la sesión actual (crea si no existe)
+    if (_chatRemote != null) {
+      if (_currentSessionId == null) {
+        final title = _buildSessionTitle(content);
+        _currentSessionId = await _chatRemote!.createSession(
+          userId: _userId,
+          title: title,
+        );
+      }
+      await _chatRemote!.addMessage(
+        sessionId: _currentSessionId!,
+        isUser: isUser,
+        content: content,
+        placeType: placeType,
+      );
+    }
+  }
+
+  @override
+  Future<String> startNewSession({required String userId, String? title}) async {
+    if (_chatRemote == null) {
+      // Sin remoto: simplemente resetea el contexto local
+      _currentSessionId = null;
+      return 'local';
+    }
+    final t = title?.trim().isNotEmpty == true ? title!.trim() : 'Nueva conversación';
+    final id = await _chatRemote!.createSession(userId: userId, title: t);
+    _currentSessionId = id;
+    return id;
+  }
+
+  @override
+  Future<List<ChatSessionEntity>> listChatSessions({required String userId}) async {
+    if (_chatRemote == null) return [];
+    final raw = await _chatRemote!.listSessions(userId);
+    return raw.map((r) {
+      return ChatSessionEntity(
+        id: r['id'].toString(),
+        title: r['title']?.toString() ?? 'Conversación',
+        createdAt: DateTime.parse(r['created_at'].toString()),
+        lastMessageAt: r['last_message_at'] != null
+            ? DateTime.parse(r['last_message_at'].toString())
+            : null,
+        isArchived: (r['is_archived'] ?? false) == true,
+      );
+    }).toList();
+  }
+
+  @override
+  Future<List<ChatMessageEntity>> getSessionMessages({
+    required String sessionId,
+    int limit = 200,
+  }) async {
+    if (_chatRemote == null) return [];
+    final raw = await _chatRemote!.getMessages(sessionId: sessionId, limit: limit);
+    return raw.map((m) {
+      final isUser = (m['role']?.toString() ?? 'user') == 'user';
+      return ChatMessageEntity(
+        id: m['id'].toString(),
+        content: m['content']?.toString() ?? '',
+        isUser: isUser,
+        timestamp: DateTime.parse(m['created_at'].toString()),
+        placeType: m['place_type']?.toString(),
+      );
+    }).toList();
+  }
+
+  String _buildSessionTitle(String firstMessage) {
+    final t = firstMessage.trim().replaceAll(RegExp(r'\s+'), ' ');
+    return t.length > 60 ? '${t.substring(0, 57)}…' : t;
   }
 
   @override

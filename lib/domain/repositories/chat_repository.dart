@@ -1,5 +1,6 @@
 import 'package:wanderly/domain/entities/place_entity.dart';
 import 'package:wanderly/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/domain/entities/chat_session_entity.dart';
 
 abstract class ChatRepository {
   Future<String> sendMessage({
@@ -26,4 +27,12 @@ abstract class ChatRepository {
   });
 
   Future<void> clearChatHistory({required String userId});
+
+  // NUEVO: sesiones persistidas en Supabase
+  Future<String> startNewSession({required String userId, String? title});
+  Future<List<ChatSessionEntity>> listChatSessions({required String userId});
+  Future<List<ChatMessageEntity>> getSessionMessages({
+    required String sessionId,
+    int limit,
+  });
 }

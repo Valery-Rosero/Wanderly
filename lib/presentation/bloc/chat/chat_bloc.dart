@@ -110,15 +110,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         timestamp: DateTime.now(),
       ),
     );
-    // Persistir historial local en móvil
-    if (!kIsWeb) {
-      await _chatRepository.saveChatMessage(
-        userId: _userId,
-        content: event.message,
-        isUser: true,
-        timestamp: DateTime.now(),
-      );
-    }
+    // Persistir historial (local si disponible, remoto en Supabase)
+    await _chatRepository.saveChatMessage(
+      userId: _userId,
+      content: event.message,
+      isUser: true,
+      timestamp: DateTime.now(),
+    );
     // Mostrar estado de carga mientras la IA responde
     emit(ChatLoading());
 
@@ -138,14 +136,12 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           timestamp: DateTime.now(),
         ),
       );
-      if (!kIsWeb) {
-        await _chatRepository.saveChatMessage(
-          userId: _userId,
-          content: visibleText,
-          isUser: false,
-          timestamp: DateTime.now(),
-        );
-      }
+      await _chatRepository.saveChatMessage(
+        userId: _userId,
+        content: visibleText,
+        isUser: false,
+        timestamp: DateTime.now(),
+      );
       // Intentar extraer places del sufijo JSON_PLACES
       _places = _parsePlacesFromResponse(respuesta);
       // Enriquecer lugares con datos reales (teléfono, web, dirección) usando Nominatim
