@@ -28,6 +28,7 @@ class _MapFullPageState extends State<MapFullPage> {
   final _routing = RoutingRemoteDataSource();
   List<latlng.LatLng> _routePoints = [];
   bool _loadingRoute = false;
+  RoutingMode _mode = RoutingMode.driving;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _MapFullPageState extends State<MapFullPage> {
           startLon: user.longitude,
           endLat: dest.latitude,
           endLon: dest.longitude,
+          mode: _mode,
         );
         setState(() {
           _routePoints = coords.map((c) => latlng.LatLng(c[0], c[1])).toList();
@@ -57,6 +59,31 @@ class _MapFullPageState extends State<MapFullPage> {
       } finally {
         if (mounted) setState(() => _loadingRoute = false);
       }
+    }
+  }
+
+  Future<void> _recalculateRoute() async {
+    final user = widget.userLocation;
+    final dest = widget.selectedPlace;
+    if (user == null || dest == null) return;
+    setState(() => _loadingRoute = true);
+    try {
+      final coords = await _routing.getRoute(
+        startLat: user.latitude,
+        startLon: user.longitude,
+        endLat: dest.latitude,
+        endLon: dest.longitude,
+        mode: _mode,
+      );
+      setState(() {
+        _routePoints = coords.map((c) => latlng.LatLng(c[0], c[1])).toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo calcular la ruta: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingRoute = false);
     }
   }
 
@@ -126,6 +153,50 @@ class _MapFullPageState extends State<MapFullPage> {
               mapController.move(widget.center, 16.0);
             },
           ),
+          PopupMenuButton<RoutingMode>(
+            tooltip: 'Modo de ruta',
+            initialValue: _mode,
+            onSelected: (mode) {
+              setState(() => _mode = mode);
+              _recalculateRoute();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: RoutingMode.driving,
+                child: Row(
+                  children: const [
+                    Icon(Icons.directions_car),
+                    SizedBox(width: 8),
+                    Text('Coche'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: RoutingMode.walking,
+                child: Row(
+                  children: const [
+                    Icon(Icons.directions_walk),
+                    SizedBox(width: 8),
+                    Text('A pie'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: RoutingMode.cycling,
+                child: Row(
+                  children: const [
+                    Icon(Icons.pedal_bike),
+                    SizedBox(width: 8),
+                    Text('Bici'),
+                  ],
+                ),
+              ),
+            ],
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8.0),
+              child: Icon(Icons.alt_route),
+            ),
+          ),
         ],
       ),
       body: Stack(
@@ -158,12 +229,97 @@ class _MapFullPageState extends State<MapFullPage> {
                     Polyline(
                       points: _routePoints,
                       strokeWidth: 4,
-                      color: Colors.deepPurple,
+                      color: _mode == RoutingMode.driving
+                          ? Colors.deepPurple
+                          : (_mode == RoutingMode.walking
+                              ? Colors.green
+                              : Colors.orange),
                     ),
                   ],
                 ),
               MarkerLayer(markers: markers),
             ],
+          ),
+          // Selector flotante visible en móvil
+          Positioned(
+            top: 12,
+            right: 12,
+            child: SafeArea(
+              top: true,
+              child: Material(
+                color: Colors.white,
+                elevation: 3,
+                borderRadius: BorderRadius.circular(12),
+                child: PopupMenuButton<RoutingMode>(
+                  initialValue: _mode,
+                  tooltip: 'Modo de ruta',
+                  onSelected: (mode) {
+                    setState(() => _mode = mode);
+                    _recalculateRoute();
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: RoutingMode.driving,
+                      child: Row(
+                        children: [
+                          Icon(Icons.directions_car),
+                          SizedBox(width: 8),
+                          Text('Auto'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: RoutingMode.walking,
+                      child: Row(
+                        children: [
+                          Icon(Icons.directions_walk),
+                          SizedBox(width: 8),
+                          Text('Caminando'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: RoutingMode.cycling,
+                      child: Row(
+                        children: [
+                          Icon(Icons.directions_bike),
+                          SizedBox(width: 8),
+                          Text('Bici'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _mode == RoutingMode.driving
+                              ? Icons.directions_car
+                              : _mode == RoutingMode.walking
+                                  ? Icons.directions_walk
+                                  : Icons.directions_bike,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _mode == RoutingMode.driving
+                              ? 'Auto'
+                              : _mode == RoutingMode.walking
+                                  ? 'Caminando'
+                                  : 'Bici',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.expand_more, size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
           if (_loadingRoute)
             const Positioned.fill(
@@ -184,8 +340,42 @@ class _MapFullPageState extends State<MapFullPage> {
                 child: const Icon(Icons.clear),
               ),
             ),
+          // Botón flotante para alternar rápidamente el modo de ruta
+          Positioned(
+            right: 12,
+            bottom: 72,
+            child: FloatingActionButton.small(
+              tooltip: 'Cambiar modo de ruta',
+              onPressed: _cycleMode,
+              child: Icon(
+                _mode == RoutingMode.driving
+                    ? Icons.directions_car
+                    : _mode == RoutingMode.walking
+                        ? Icons.directions_walk
+                        : Icons.directions_bike,
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  // Alternar modo con botón flotante
+  void _cycleMode() {
+    setState(() {
+      switch (_mode) {
+        case RoutingMode.driving:
+          _mode = RoutingMode.walking;
+          break;
+        case RoutingMode.walking:
+          _mode = RoutingMode.cycling;
+          break;
+        case RoutingMode.cycling:
+          _mode = RoutingMode.driving;
+          break;
+      }
+    });
+    _recalculateRoute();
   }
 }

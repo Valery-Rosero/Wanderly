@@ -85,20 +85,27 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<String> startNewSession({required String userId, String? title}) async {
+  Future<String> startNewSession({
+    required String userId,
+    String? title,
+  }) async {
     if (_chatRemote == null) {
       // Sin remoto: simplemente resetea el contexto local
       _currentSessionId = null;
       return 'local';
     }
-    final t = title?.trim().isNotEmpty == true ? title!.trim() : 'Nueva conversación';
+    final t = title?.trim().isNotEmpty == true
+        ? title!.trim()
+        : 'Nueva conversación';
     final id = await _chatRemote!.createSession(userId: userId, title: t);
     _currentSessionId = id;
     return id;
   }
 
   @override
-  Future<List<ChatSessionEntity>> listChatSessions({required String userId}) async {
+  Future<List<ChatSessionEntity>> listChatSessions({
+    required String userId,
+  }) async {
     if (_chatRemote == null) return [];
     final raw = await _chatRemote!.listSessions(userId);
     return raw.map((r) {
@@ -120,7 +127,10 @@ class ChatRepositoryImpl implements ChatRepository {
     int limit = 200,
   }) async {
     if (_chatRemote == null) return [];
-    final raw = await _chatRemote!.getMessages(sessionId: sessionId, limit: limit);
+    final raw = await _chatRemote!.getMessages(
+      sessionId: sessionId,
+      limit: limit,
+    );
     return raw.map((m) {
       final isUser = (m['role']?.toString() ?? 'user') == 'user';
       return ChatMessageEntity(
@@ -201,6 +211,22 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<void> clearChatHistory({required String userId}) async {
     if (_historyLocal == null) return;
     await _historyLocal.clearHistory(userId);
+  }
+
+  @override
+  Future<void> deleteSession({required String sessionId}) async {
+    if (_chatRemote == null) return;
+    await _chatRemote!.deleteSession(sessionId);
+    if (_currentSessionId == sessionId) {
+      _currentSessionId = null;
+    }
+  }
+
+  @override
+  Future<void> deleteAllSessions({required String userId}) async {
+    if (_chatRemote == null) return;
+    await _chatRemote!.deleteAllSessions(userId);
+    _currentSessionId = null;
   }
 
   (double, double) _parseCoordenadas(String coordenadas) {

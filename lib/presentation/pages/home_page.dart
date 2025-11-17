@@ -49,7 +49,11 @@ class _HomePageState extends State<HomePage> {
   bool _mapVisible = true;
   final MapController _mapController = MapController();
   final RoutingRemoteDataSource _routing = RoutingRemoteDataSource();
+  RoutingMode _routingMode = RoutingMode.driving;
   List<latlng.LatLng> _routePoints = [];
+  final ScrollController _chatScrollController = ScrollController();
+  // Clave para ubicar y enfocar el último mensaje del usuario
+  final GlobalKey _lastUserMessageKey = GlobalKey();
 
   @override
   void initState() {
@@ -448,6 +452,7 @@ class _HomePageState extends State<HomePage> {
                 print('💬 ChatBloc State: ${state.runtimeType}');
 
                 if (state is ChatLoading) {
+                  _scrollToBottomSoon();
                   return const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -460,17 +465,34 @@ class _HomePageState extends State<HomePage> {
                   );
                 } else if (state is ChatLoaded) {
                   final mensajes = state.messages;
+                  _focusLastUserMessageSoon();
+                  // Índice del último mensaje enviado por el usuario
+                  int lastUserIndex = -1;
+                  for (int i = mensajes.length - 1; i >= 0; i--) {
+                    if (mensajes[i].isUser) {
+                      lastUserIndex = i;
+                      break;
+                    }
+                  }
                   return ListView.builder(
+                    controller: _chatScrollController,
+                    cacheExtent: 1000,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                     itemCount: mensajes.length,
                     itemBuilder: (context, i) {
                       final m = mensajes[i];
                       final isLastBot = !m.isUser && i == mensajes.length - 1;
-                      return ChatMessageWidget(
-                        message: m,
-                        places: isLastBot ? state.places : const [],
-                        onPlaceTap: (place) =>
-                            _openMapForPlace(place, state.places),
+                      // Asignar clave al último mensaje del usuario para poder enfocarlo
+                      return Container(
+                        key: (i == lastUserIndex && m.isUser)
+                            ? _lastUserMessageKey
+                            : null,
+                        child: ChatMessageWidget(
+                          message: m,
+                          places: isLastBot ? state.places : const [],
+                          onPlaceTap: (place) =>
+                              _openMapForPlace(place, state.places),
+                        ),
                       );
                     },
                   );
@@ -542,6 +564,64 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+  }
+
+  void _scrollToBottomSoon() {
+    if (!_chatScrollController.hasClients) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        _chatScrollController.animateTo(
+          _chatScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      } catch (_) {}
+    });
+  }
+
+  // Enfoca el último mensaje del usuario después de construir la lista
+  void _focusLastUserMessageSoon() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Pequeño retraso para asegurar que el ListView terminó su layout
+      await Future.delayed(const Duration(milliseconds: 60));
+      final ctx = _lastUserMessageKey.currentContext;
+      if (ctx != null) {
+        try {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 400),
+            alignment: 0.85,
+            curve: Curves.easeOut,
+          );
+          return;
+        } catch (_) {}
+      }
+
+      // Fallback: si no se encontró el contexto (por reciclaje del ListView),
+      // desplazamos cerca del final para intentar dejar visible el último mensaje del usuario.
+      if (_chatScrollController.hasClients) {
+        final max = _chatScrollController.position.maxScrollExtent;
+        final target = (max - 300).clamp(0.0, max);
+        try {
+          _chatScrollController.animateTo(
+            target,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOut,
+          );
+        } catch (_) {}
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    print('🏠 HomePage dispose llamado');
+    if (_chatInicializado) {
+      _chatBloc.close();
+    }
+    _locationSubscription?.cancel();
+    _chatScrollController.dispose();
+    super.dispose();
   }
 
   Widget _buildPlacesList(List<PlaceEntity> places) {
@@ -681,13 +761,76 @@ class _HomePageState extends State<HomePage> {
                     (context.read<AuthBloc>().state as AuthAuthenticated)
                         .user
                         .id;
-                await Navigator.push(
+                final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) =>
                         HistoryPage(chatRepository: _chatRepo, userId: uid),
                   ),
                 );
+                if (result is Map && result['newSessionId'] != null) {
+                  // Resetear el chat para iniciar conversación limpia
+                  if (_chatInicializado) {
+                    _chatBloc.add(const ResetChatEvent());
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Chat nuevo iniciado'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Limpiar chat'),
+              onTap: () async {
+                Navigator.pop(context);
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Limpiar chat'),
+                    content: const Text(
+                      'Se borrará el historial del chat guardado localmente. ¿Quieres continuar?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancelar'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Limpiar'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  try {
+                    final uid =
+                        (context.read<AuthBloc>().state as AuthAuthenticated)
+                            .user
+                            .id;
+                    await _chatRepo.clearChatHistory(userId: uid);
+                    if (_chatInicializado) {
+                      _chatBloc.add(const ResetChatEvent());
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Chat limpiado'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error al limpiar chat: $e'),
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
               },
             ),
             const Divider(),
@@ -914,12 +1057,95 @@ class _HomePageState extends State<HomePage> {
                         Polyline(
                           points: _routePoints,
                           strokeWidth: 4,
-                          color: Colors.deepPurple,
+                          color: _routeColor(_routingMode),
                         ),
                       ],
                     ),
                   MarkerLayer(markers: markers),
                 ],
+              ),
+              // Selector de modo de ruta (auto / caminando / bici)
+              Positioned(
+                top: 68,
+                right: 12,
+                child: SafeArea(
+                  top: true,
+                  child: Material(
+                    color: Colors.white,
+                    elevation: 3,
+                    borderRadius: BorderRadius.circular(12),
+                    child: PopupMenuButton<RoutingMode>(
+                      initialValue: _routingMode,
+                      tooltip: 'Modo de ruta',
+                      onSelected: (mode) {
+                        setState(() {
+                          _routingMode = mode;
+                        });
+                        _recalculateEmbeddedRoute();
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: RoutingMode.driving,
+                          child: Row(
+                            children: [
+                              Icon(Icons.directions_car),
+                              SizedBox(width: 8),
+                              Text('Auto'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: RoutingMode.walking,
+                          child: Row(
+                            children: [
+                              Icon(Icons.directions_walk),
+                              SizedBox(width: 8),
+                              Text('Caminando'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: RoutingMode.cycling,
+                          child: Row(
+                            children: [
+                              Icon(Icons.directions_bike),
+                              SizedBox(width: 8),
+                              Text('Bici'),
+                            ],
+                          ),
+                        ),
+                      ],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _routingMode == RoutingMode.driving
+                                  ? Icons.directions_car
+                                  : _routingMode == RoutingMode.walking
+                                      ? Icons.directions_walk
+                                      : Icons.directions_bike,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _routingMode == RoutingMode.driving
+                                  ? 'Auto'
+                                  : _routingMode == RoutingMode.walking
+                                      ? 'Caminando'
+                                      : 'Bici',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.expand_more, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
               // Botón para abrir el mapa en otra página cuando haya lugares
               if (places.isNotEmpty)
@@ -940,6 +1166,22 @@ class _HomePageState extends State<HomePage> {
                     label: const Text('Abrir mapa'),
                   ),
                 ),
+              // Botón flotante para alternar modo de ruta en el mapa embebido
+              Positioned(
+                right: 12,
+                bottom: 72,
+                child: FloatingActionButton.small(
+                  tooltip: 'Cambiar modo de ruta',
+                  onPressed: _cycleEmbeddedMode,
+                  child: Icon(
+                    _routingMode == RoutingMode.driving
+                        ? Icons.directions_car
+                        : _routingMode == RoutingMode.walking
+                            ? Icons.directions_walk
+                            : Icons.directions_bike,
+                  ),
+                ),
+              ),
               // Search bar overlayed on top of the map (prevents page overflow)
               Positioned(
                 left: 12,
@@ -1130,17 +1372,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  @override
-  void dispose() {
-    print('🏠 HomePage dispose llamado');
-    if (_chatInicializado) {
-      _chatBloc.close();
-    }
-    // Cancel location subscription to prevent memory leaks
-    _locationSubscription?.cancel();
-    super.dispose();
-  }
-
   void _centerOnUserLocation() {
     if (_ubicacionActual != null) {
       final userLocation = latlng.LatLng(
@@ -1244,6 +1475,7 @@ class _HomePageState extends State<HomePage> {
           startLon: _ubicacionActual!.longitude,
           endLat: place.latitude,
           endLon: place.longitude,
+          mode: _routingMode,
         );
         setState(() {
           _routePoints = points.map((p) => latlng.LatLng(p[0], p[1])).toList();
@@ -1277,7 +1509,7 @@ class _HomePageState extends State<HomePage> {
                       place.address,
                       style: const TextStyle(fontSize: 12),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
@@ -1294,5 +1526,55 @@ class _HomePageState extends State<HomePage> {
     print(
       '🎯 Centrado en: ${place.name} (${place.latitude}, ${place.longitude})',
     );
+  }
+
+  // Recalcular la ruta del mapa embebido según el modo seleccionado
+  Future<void> _recalculateEmbeddedRoute() async {
+    try {
+      if (_ubicacionActual != null && _ubicacionSeleccionada != null) {
+        final points = await _routing.getRoute(
+          startLat: _ubicacionActual!.latitude,
+          startLon: _ubicacionActual!.longitude,
+          endLat: _ubicacionSeleccionada!.latitude,
+          endLon: _ubicacionSeleccionada!.longitude,
+          mode: _routingMode,
+        );
+        setState(() {
+          _routePoints = points.map((p) => latlng.LatLng(p[0], p[1])).toList();
+        });
+      }
+    } catch (e) {
+      print('⚠️ Error recalculando ruta: $e');
+    }
+  }
+
+  // Color del polyline por modo de enrutamiento
+  Color _routeColor(RoutingMode mode) {
+    switch (mode) {
+      case RoutingMode.driving:
+        return Colors.deepPurple;
+      case RoutingMode.walking:
+        return Colors.green.shade700;
+      case RoutingMode.cycling:
+        return Colors.orange.shade700;
+    }
+  }
+
+  // Alternar modo en mapa embebido con botón flotante
+  void _cycleEmbeddedMode() {
+    setState(() {
+      switch (_routingMode) {
+        case RoutingMode.driving:
+          _routingMode = RoutingMode.walking;
+          break;
+        case RoutingMode.walking:
+          _routingMode = RoutingMode.cycling;
+          break;
+        case RoutingMode.cycling:
+          _routingMode = RoutingMode.driving;
+          break;
+      }
+    });
+    _recalculateEmbeddedRoute();
   }
 }

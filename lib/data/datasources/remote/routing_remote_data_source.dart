@@ -1,15 +1,23 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+enum RoutingMode { driving, walking, cycling }
+
 class RoutingRemoteDataSource {
   Future<List<List<double>>> getRoute({
     required double startLat,
     required double startLon,
     required double endLat,
     required double endLon,
+    RoutingMode mode = RoutingMode.driving,
   }) async {
+    final profile = switch (mode) {
+      RoutingMode.driving => 'driving',
+      RoutingMode.walking => 'walking',
+      RoutingMode.cycling => 'cycling',
+    };
     final url = Uri.parse(
-        'https://router.project-osrm.org/route/v1/driving/$startLon,$startLat;$endLon,$endLat?overview=full&geometries=geojson');
+        'https://router.project-osrm.org/route/v1/$profile/$startLon,$startLat;$endLon,$endLat?overview=full&geometries=geojson');
     final res = await http.get(url, headers: {
       'User-Agent': 'WanderlyApp/1.0 (+https://wanderly.example)'
     });

@@ -73,7 +73,8 @@ class ChatHistoryLocalDataSource {
     return rows
         .map(
           (r) => ChatMessageEntity(
-            id: (r['id']?.toString()) ??
+            id:
+                (r['id']?.toString()) ??
                 DateTime.now().millisecondsSinceEpoch.toString(),
             content: r['content'] as String,
             isUser: (r['is_user'] as int) == 1,

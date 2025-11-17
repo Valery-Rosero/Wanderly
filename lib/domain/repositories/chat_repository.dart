@@ -35,4 +35,7 @@ abstract class ChatRepository {
     required String sessionId,
     int limit,
   });
+  // NUEVO: eliminación de sesiones en Supabase
+  Future<void> deleteSession({required String sessionId});
+  Future<void> deleteAllSessions({required String userId});
 }

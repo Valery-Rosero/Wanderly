@@ -5,6 +5,7 @@ import 'package:wanderly/domain/entities/chat_message_entity.dart';
 import 'package:wanderly/presentation/bloc/chat/chat_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessageEntity message;
@@ -78,15 +79,34 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
               ),
               const SizedBox(height: 8),
             ],
-            // Texto del mensaje con formato simple de negrilla (**texto**)
-            SelectableText.rich(
-              TextSpan(
-                children: _buildFormattedSpans(
-                  widget.message.content,
-                  Theme.of(context).textTheme.bodyLarge!,
+            // Renderizado Markdown bonito para títulos, listas y enlaces
+            MarkdownBody(
+              data: widget.message.content,
+              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                h1: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                h2: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                h3: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                p: Theme.of(context).textTheme.bodyMedium,
+                listBullet: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+                blockquoteDecoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              textAlign: TextAlign.left,
+              onTapLink: (text, href, title) {
+                if (href == null) return;
+                // Abre enlaces externos; mantiene chips rápidos para teléfonos aparte
+                launchUrl(Uri.parse(href), mode: LaunchMode.externalApplication);
+              },
             ),
 
             // Acciones rápidas para teléfonos y enlaces presentes en el contenido

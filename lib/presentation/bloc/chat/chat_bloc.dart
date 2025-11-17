@@ -81,6 +81,10 @@ class SaveFavoritePlaceEvent extends ChatEvent {
   List<Object> get props => [place];
 }
 
+class ResetChatEvent extends ChatEvent {
+  const ResetChatEvent();
+}
+
 // BLoC
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ChatRepository _chatRepository;
@@ -95,6 +99,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<SendMessageEvent>(_onEnviarMensaje);
     on<SaveFavoritePlaceEvent>(_onGuardarLugarFavorito);
     on<LoadChatHistoryEvent>(_onLoadChatHistory);
+    on<ResetChatEvent>(_onResetChat);
   }
 
   Future<void> _onEnviarMensaje(
@@ -188,6 +193,15 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     } catch (e) {
       emit(ChatError('No se pudo cargar historial: $e'));
     }
+  }
+
+  Future<void> _onResetChat(
+    ResetChatEvent event,
+    Emitter<ChatState> emit,
+  ) async {
+    _mensajes.clear();
+    _places = [];
+    emit(ChatLoaded(List.from(_mensajes), places: List.from(_places)));
   }
 
   List<PlaceEntity> _parsePlacesFromResponse(String respuesta) {
