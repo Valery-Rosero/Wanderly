@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
-import 'package:flutter_application_movile/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/domain/repositories/chat_repository.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
 
 class HistoryPage extends StatefulWidget {
   final ChatRepository chatRepository;
-  final String usuarioId;
+  final String userId;
 
   const HistoryPage({
     super.key,
     required this.chatRepository,
-    required this.usuarioId,
+    required this.userId,
   });
 
   @override
@@ -34,7 +34,7 @@ class _HistoryPageState extends State<HistoryPage> {
     });
     try {
       final data = await widget.chatRepository.getChatHistory(
-        userId: widget.usuarioId,
+        userId: widget.userId,
         limit: 500,
       );
       setState(() {
@@ -51,7 +51,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _clearHistory() async {
     try {
-      await widget.chatRepository.clearChatHistory(userId: widget.usuarioId);
+      await widget.chatRepository.clearChatHistory(userId: widget.userId);
       await _loadHistory();
       ScaffoldMessenger.of(
         context,

@@ -1,4 +1,4 @@
-import 'package:flutter_application_movile/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
 
 class ChatMessageModel {
   final String id;

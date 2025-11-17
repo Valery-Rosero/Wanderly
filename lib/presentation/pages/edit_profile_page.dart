@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_movile/data/constants/cities.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:wanderly/data/constants/cities.dart';
+import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

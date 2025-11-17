@@ -1,5 +1,5 @@
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
-import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
 
 abstract class ChatRepository {
   Future<String> sendMessage({
@@ -7,7 +7,7 @@ abstract class ChatRepository {
     required double latitude,
     required double longitude,
   });
-  
+
   Future<void> saveFavoritePlace(PlaceEntity place);
   Future<List<PlaceEntity>> getFavoritePlaces();
 
@@ -25,7 +25,5 @@ abstract class ChatRepository {
     int limit,
   });
 
-  Future<void> clearChatHistory({
-    required String userId,
-  });
+  Future<void> clearChatHistory({required String userId});
 }

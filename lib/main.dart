@@ -1,36 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
-import 'package:flutter_application_movile/core/config/supabase_config.dart';
-import 'package:flutter_application_movile/data/repositories/auth_repository_impl.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
-import 'package:flutter_application_movile/presentation/pages/home_page.dart';
-import 'package:flutter_application_movile/presentation/pages/login_page.dart';
-import 'package:flutter_application_movile/presentation/pages/register_page.dart';
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
+import 'package:wanderly/core/config/supabase_config.dart';
+import 'package:wanderly/data/repositories/auth_repository_impl.dart';
+import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
+import 'package:wanderly/presentation/pages/home_page.dart';
+import 'package:wanderly/presentation/pages/login_page.dart';
+import 'package:wanderly/presentation/pages/register_page.dart';
+import 'package:wanderly/core/theme/app_theme.dart';
+import 'package:wanderly/domain/repositories/auth_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Inicializar Supabase PRIMERO
   await SupabaseConfig.initialize();
-  
+
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final supabase.SupabaseClient supabaseClient = supabase.Supabase.instance.client;
+  final supabase.SupabaseClient supabaseClient =
+      supabase.Supabase.instance.client;
 
   MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return RepositoryProvider(
+    return RepositoryProvider<AuthRepository>(
       create: (context) => AuthRepositoryImpl(supabaseClient),
       child: BlocProvider(
-        create: (context) => AuthBloc(
-          authRepository: context.read<AuthRepositoryImpl>(),
-        )..add(CheckAuthStatus()),
+        create: (context) =>
+            AuthBloc(authRepository: context.read<AuthRepository>())
+              ..add(CheckAuthStatus()),
         child: MaterialApp(
           title: 'Wanderly',
           debugShowCheckedModeBanner: false,
@@ -49,13 +51,13 @@ class MyApp extends StatelessWidget {
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
-//hala madrid
+  //hala madrid
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
         print('🔍 AuthWrapper - Estado actual: ${state.runtimeType}');
-        
+
         if (state is AuthAuthenticated) {
           print('✅ Navegando a HomePage - Usuario: ${state.user.email}');
           return const HomePage();
@@ -75,7 +77,7 @@ class AuthWrapper extends StatelessWidget {
           });
           return LoginPage();
         }
-        
+
         // Estado inicial o loading
         print('⏳ Mostrando loading...');
         return const Scaffold(

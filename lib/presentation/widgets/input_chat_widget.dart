@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
+import 'package:wanderly/core/theme/app_theme.dart';
 
 class InputChatWidget extends StatefulWidget {
   final Function(String) onEnviarMensaje;

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
-import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
-import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/presentation/bloc/chat/chat_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 

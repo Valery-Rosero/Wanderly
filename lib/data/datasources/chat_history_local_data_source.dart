@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
-import 'package:flutter_application_movile/data/datasources/local/sqlite_database.dart';
-import 'package:flutter_application_movile/domain/entities/chat_message_entity.dart';
-import 'package:flutter_application_movile/domain/entities/place_entity.dart';
+import 'package:wanderly/data/datasources/local/sqlite_database.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
 
 class ChatHistoryLocalDataSource {
   final Database _db;

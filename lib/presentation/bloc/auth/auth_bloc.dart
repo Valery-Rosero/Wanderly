@@ -1,8 +1,8 @@
 import 'package:bloc/bloc.dart';
 import 'dart:async';
-import 'package:equatable/equatable.dart';  
-import 'package:flutter_application_movile/domain/entities/usuario_entity.dart';
-import 'package:flutter_application_movile/domain/repositories/auth_repository.dart';
+import 'package:equatable/equatable.dart';
+import 'package:wanderly/domain/entities/user_entity.dart';
+import 'package:wanderly/domain/repositories/auth_repository.dart';
 
 abstract class AuthState extends Equatable {
   const AuthState();
@@ -62,10 +62,7 @@ class SignInRequested extends AuthEvent {
   final String email;
   final String password;
 
-  const SignInRequested({
-    required this.email,
-    required this.password,
-  });
+  const SignInRequested({required this.email, required this.password});
 
   @override
   List<Object> get props => [email, password];
@@ -126,12 +123,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         if (user != null) {
           emit(AuthAuthenticated(user));
         } else {
-          emit(const AuthError('Failed to initialize user session after signup'));
+          emit(
+            const AuthError('Failed to initialize user session after signup'),
+          );
         }
       } catch (e) {
         // Si el proveedor requiere confirmación de email, mostrar message claro
         final msg = e.toString().replaceAll('Exception: ', '');
-        emit(AuthError(msg.isEmpty ? 'Error signing in after registration' : msg));
+        emit(
+          AuthError(msg.isEmpty ? 'Error signing in after registration' : msg),
+        );
       }
     } catch (e) {
       emit(AuthError(e.toString().replaceAll('Exception: ', '')));
@@ -148,7 +149,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         email: event.email,
         password: event.password,
       );
-      
+
       // Ensure the session is established and user is available
       UserEntity? user;
       try {

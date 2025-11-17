@@ -1,4 +1,4 @@
-import 'package:flutter_application_movile/domain/entities/user_entity.dart';
+import 'package:wanderly/domain/entities/user_entity.dart';
 
 class UserModel {
   final String id;

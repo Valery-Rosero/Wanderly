@@ -2,25 +2,25 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
-import 'package:flutter_application_movile/data/datasources/local/chat_history_local_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/geocoding_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/places_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/routing_remote_data_source.dart';
-import 'package:flutter_application_movile/data/repositories/chat_repository_impl.dart';
-import 'package:flutter_application_movile/domain/entities/place_entity.dart';
-import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
-import 'package:flutter_application_movile/presentation/bloc/chat/chat_bloc.dart';
-import 'package:flutter_application_movile/presentation/pages/favorites_page.dart';
-import 'package:flutter_application_movile/presentation/pages/history_page.dart';
-import 'package:flutter_application_movile/presentation/pages/map_full_page.dart';
-import 'package:flutter_application_movile/presentation/pages/profile_page.dart';
-import 'package:flutter_application_movile/presentation/widgets/input_chat_widget.dart';
-import 'package:flutter_application_movile/presentation/widgets/chat_message_widget.dart';
-import 'package:flutter_application_movile/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/core/theme/app_theme.dart';
+import 'package:wanderly/data/datasources/local/chat_history_local_data_source.dart';
+import 'package:wanderly/data/datasources/local/favorites_local_data_source.dart';
+import 'package:wanderly/data/datasources/remote/gemini_remote_data_source.dart';
+import 'package:wanderly/data/datasources/remote/geocoding_remote_data_source.dart';
+import 'package:wanderly/data/datasources/remote/places_remote_data_source.dart';
+import 'package:wanderly/data/datasources/remote/routing_remote_data_source.dart';
+import 'package:wanderly/data/repositories/chat_repository_impl.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
+import 'package:wanderly/domain/repositories/chat_repository.dart';
+import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
+import 'package:wanderly/presentation/bloc/chat/chat_bloc.dart';
+import 'package:wanderly/presentation/pages/favorites_page.dart';
+import 'package:wanderly/presentation/pages/history_page.dart';
+import 'package:wanderly/presentation/pages/map_full_page.dart';
+import 'package:wanderly/presentation/pages/profile_page.dart';
+import 'package:wanderly/presentation/widgets/input_chat_widget.dart';
+import 'package:wanderly/presentation/widgets/chat_message_widget.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -681,7 +681,7 @@ class _HomePageState extends State<HomePage> {
                   context,
                   MaterialPageRoute(
                     builder: (_) =>
-                        HistoryPage(chatRepository: _chatRepo, usuarioId: uid),
+                        HistoryPage(chatRepository: _chatRepo, userId: uid),
                   ),
                 );
               },

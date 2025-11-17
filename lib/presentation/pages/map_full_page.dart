@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlng;
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
-import 'package:flutter_application_movile/domain/entities/place_entity.dart';
-import 'package:flutter_application_movile/data/datasources/remote/routing_remote_data_source.dart';
+import 'package:wanderly/core/theme/app_theme.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
+import 'package:wanderly/data/datasources/remote/routing_remote_data_source.dart';
 
 class MapFullPage extends StatefulWidget {
   final latlng.LatLng center;

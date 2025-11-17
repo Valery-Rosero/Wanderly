@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:wanderly/core/theme/app_theme.dart';
+import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});

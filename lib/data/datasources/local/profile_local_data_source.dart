@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:flutter_application_movile/data/datasources/local/sqlite_database.dart';
+import 'package:wanderly/data/datasources/local/sqlite_database.dart';
 
 class UserProfile {
   final String userId;

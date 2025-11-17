@@ -1,7 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_application_movile/domain/entities/user_entity.dart';
-import 'package:flutter_application_movile/domain/repositories/auth_repository.dart';
-import 'package:flutter_application_movile/data/models/user_model.dart';
+import 'package:wanderly/domain/entities/user_entity.dart';
+import 'package:wanderly/domain/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final SupabaseClient _supabase;
@@ -127,7 +126,9 @@ class AuthRepositoryImpl implements AuthRepository {
           return UserEntity(
             id: response['id'] as String? ?? user.id,
             email: user.email ?? '',
-            name: response['first_name'] as String? ?? (user.userMetadata?['full_name'] as String?),
+            name:
+                response['first_name'] as String? ??
+                (user.userMetadata?['full_name'] as String?),
             createdAt: DateTime.now(),
           );
         } else {

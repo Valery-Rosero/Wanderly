@@ -3,7 +3,7 @@ class ChatMessageEntity {
   final String content;
   final bool isUser;
   final DateTime timestamp;
-  final String? placeType; 
+  final String? placeType;
 
   ChatMessageEntity({
     required this.id,

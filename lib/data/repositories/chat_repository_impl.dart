@@ -1,10 +1,10 @@
-import 'package:flutter_application_movile/data/datasources/local/chat_history_local_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/gemini_remote_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/places_remote_data_source.dart';
-import 'package:flutter_application_movile/domain/entities/lugar_entity.dart';
-import 'package:flutter_application_movile/domain/entities/mensaje_chat_entity.dart';
-import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
+import 'package:wanderly/data/datasources/local/chat_history_local_data_source.dart';
+import 'package:wanderly/data/datasources/local/favorites_local_data_source.dart';
+import 'package:wanderly/data/datasources/remote/gemini_remote_data_source.dart';
+import 'package:wanderly/data/datasources/remote/places_remote_data_source.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/domain/repositories/chat_repository.dart';
 
 class ChatRepositoryImpl implements ChatRepository {
   final GeminiRemoteDataSource _geminiDataSource;

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_movile/core/theme/app_theme.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:wanderly/core/theme/app_theme.dart';
+import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class LoginPage extends StatelessWidget {
@@ -27,7 +27,10 @@ class LoginPage extends StatelessWidget {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -38,7 +41,11 @@ class LoginPage extends StatelessWidget {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.explore, color: Colors.white, size: 32),
+                      child: const Icon(
+                        Icons.explore,
+                        color: Colors.white,
+                        size: 32,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -57,7 +64,10 @@ class LoginPage extends StatelessWidget {
                           SizedBox(height: 8),
                           Text(
                             'Tu asistente amigable de viajes y lugares',
-                            style: TextStyle(color: Colors.white70, fontSize: 14),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
@@ -71,7 +81,10 @@ class LoginPage extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20.0),
@@ -81,12 +94,16 @@ class LoginPage extends StatelessWidget {
                         children: [
                           const Text(
                             'Bienvenido de nuevo',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Inicia sesión para chatear con Wanderly y explorar lugares cercanos.',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.grey[700]),
                           ),
                           const SizedBox(height: 20),
                           TextField(
@@ -135,22 +152,29 @@ class LoginPage extends StatelessWidget {
                                   ElevatedButton(
                                     onPressed: () {
                                       final email = emailController.text.trim();
-                                      final password = passwordController.text.trim();
+                                      final password = passwordController.text
+                                          .trim();
 
                                       if (email.isEmpty || password.isEmpty) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           const SnackBar(
-                                            content: Text('Por favor completa todos los campos'),
+                                            content: Text(
+                                              'Por favor completa todos los campos',
+                                            ),
                                             backgroundColor: Colors.orange,
                                           ),
                                         );
                                         return;
                                       }
 
-                                      context.read<AuthBloc>().add(SignInRequested(
-                                            email: email,
-                                            password: password,
-                                          ));
+                                      context.read<AuthBloc>().add(
+                                        SignInRequested(
+                                          email: email,
+                                          password: password,
+                                        ),
+                                      );
                                     },
                                     child: const Text('Iniciar Sesión'),
                                   ),
@@ -159,7 +183,9 @@ class LoginPage extends StatelessWidget {
                                     onPressed: () {
                                       Navigator.pushNamed(context, '/register');
                                     },
-                                    child: const Text('¿No tienes cuenta? Regístrate aquí'),
+                                    child: const Text(
+                                      '¿No tienes cuenta? Regístrate aquí',
+                                    ),
                                   ),
                                 ],
                               );
@@ -185,10 +211,7 @@ class LoginPage extends StatelessWidget {
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  header,
-                  formCard,
-                ],
+                children: [header, formCard],
               ),
             );
           },

@@ -3,9 +3,9 @@ import 'dart:math' as math;
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_application_movile/domain/entities/place_entity.dart';
-import 'package:flutter_application_movile/domain/entities/chat_message_entity.dart';
-import 'package:flutter_application_movile/domain/repositories/chat_repository.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/domain/repositories/chat_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 

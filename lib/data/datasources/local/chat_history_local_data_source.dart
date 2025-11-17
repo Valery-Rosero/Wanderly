@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
-import 'package:flutter_application_movile/data/datasources/local/sqlite_database.dart';
-import 'package:flutter_application_movile/domain/entities/chat_message_entity.dart';
-import 'package:flutter_application_movile/domain/entities/place_entity.dart';
+import 'package:wanderly/data/datasources/local/sqlite_database.dart';
+import 'package:wanderly/domain/entities/chat_message_entity.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
 
 class ChatHistoryLocalDataSource {
   final Database _db;
@@ -37,7 +37,7 @@ class ChatHistoryLocalDataSource {
     await _db.insert('chat_history', {
       'user_id': userId,
       'content': message.content,
-      'is_User': message.isUser ? 1 : 0,
+      'is_user': message.isUser ? 1 : 0,
       'timestamp': message.timestamp.millisecondsSinceEpoch,
       'place_type': message.placeType,
       'places_json': places == null
@@ -73,11 +73,10 @@ class ChatHistoryLocalDataSource {
     return rows
         .map(
           (r) => ChatMessageEntity(
-            id:
-                (r['id']?.toString()) ??
+            id: (r['id']?.toString()) ??
                 DateTime.now().millisecondsSinceEpoch.toString(),
             content: r['content'] as String,
-            isUser: (r['is_User'] as int) == 1,
+            isUser: (r['is_user'] as int) == 1,
             timestamp: DateTime.fromMillisecondsSinceEpoch(
               (r['timestamp'] as int),
             ),

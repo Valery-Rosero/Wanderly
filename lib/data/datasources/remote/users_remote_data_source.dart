@@ -1,5 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_application_movile/data/datasources/local/profile_local_data_source.dart';
+import 'package:wanderly/data/datasources/local/profile_local_data_source.dart';
 
 class UsersRemoteDataSource {
   final SupabaseClient _supabase;

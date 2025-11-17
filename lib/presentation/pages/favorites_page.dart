@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_movile/data/datasources/local/favorites_local_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/local/profile_local_data_source.dart';
-import 'package:flutter_application_movile/data/datasources/remote/places_remote_data_source.dart';
-import 'package:flutter_application_movile/domain/entities/place_entity.dart';
-import 'package:flutter_application_movile/presentation/bloc/auth/auth_bloc.dart';
+import 'package:wanderly/data/datasources/local/favorites_local_data_source.dart';
+import 'package:wanderly/data/datasources/local/profile_local_data_source.dart';
+import 'package:wanderly/data/datasources/remote/places_remote_data_source.dart';
+import 'package:wanderly/domain/entities/place_entity.dart';
+import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
