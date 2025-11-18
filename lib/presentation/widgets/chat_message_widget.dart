@@ -6,6 +6,7 @@ import 'package:wanderly/presentation/bloc/chat/chat_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:wanderly/core/theme/app_theme.dart';
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessageEntity message;
@@ -32,7 +33,7 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
     final isUser = widget.message.isUser;
     final bubbleColor = isUser
         ? Colors.white
-        : Theme.of(context).colorScheme.primary.withOpacity(0.10);
+        : Theme.of(context).colorScheme.primary.withOpacity(0.08);
     final labelColor = isUser
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).colorScheme.primary;
@@ -45,8 +46,8 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
           color: bubbleColor,
           borderRadius: BorderRadius.circular(16),
           border: isUser
-              ? Border.all(color: Colors.grey.shade200)
-              : Border.all(color: Colors.deepPurple.shade100),
+              ? Border.all(color: Colors.grey.shade300)
+              : Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.20)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -185,13 +186,8 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                 Container(
                                   width: 24,
                                   height: 24,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Colors.deepPurple.shade400,
-                                        Colors.purple.shade600,
-                                      ],
-                                    ),
+                                  decoration: const BoxDecoration(
+                                    gradient: AppTheme.mainGradient,
                                     shape: BoxShape.circle,
                                   ),
                                   child: Center(
@@ -210,7 +206,7 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                 // Place icon
                                 Icon(
                                   _getPlaceIcon(place.placeType),
-                                  color: Colors.deepPurple.shade600,
+                                  color: Theme.of(context).colorScheme.primary,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 8),
@@ -252,7 +248,7 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                       tooltip: 'Ver en mapa',
                                       icon: Icon(
                                         Icons.location_on,
-                                        color: Colors.deepPurple.shade400,
+                                        color: Theme.of(context).colorScheme.primary,
                                       ),
                                       onPressed: () =>
                                           widget.onPlaceTap?.call(place),
@@ -300,9 +296,9 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                         place.website!.isNotEmpty)
                                       IconButton(
                                         tooltip: 'Abrir sitio web',
-                                        icon: const Icon(
+                                        icon: Icon(
                                           Icons.open_in_new,
-                                          color: Colors.blue,
+                                          color: Theme.of(context).colorScheme.secondary,
                                         ),
                                         onPressed: () {
                                           final url = place.website!;
@@ -378,11 +374,11 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                   width: 24,
                                   height: 24,
                                   decoration: BoxDecoration(
-                                    color: Colors.green.shade600,
+                                    color: Theme.of(context).colorScheme.tertiary,
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.green.shade200,
+                                        color: Theme.of(context).colorScheme.tertiary.withOpacity(0.35),
                                         blurRadius: 6,
                                         offset: const Offset(0, 2),
                                       ),
@@ -411,7 +407,7 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                 margin: const EdgeInsets.only(top: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: Theme.of(context).colorScheme.secondary.withOpacity(0.20),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -420,14 +416,14 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                     Icon(
                       Icons.touch_app,
                       size: 12,
-                      color: Colors.blue.shade600,
+                      color: Theme.of(context).colorScheme.secondary,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       'Toca un lugar para verlo en el mapa',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.blue.shade600,
+                        color: Theme.of(context).colorScheme.secondary,
                       ),
                     ),
                   ],

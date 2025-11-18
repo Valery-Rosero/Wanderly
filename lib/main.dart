@@ -9,6 +9,7 @@ import 'package:wanderly/presentation/pages/login_page.dart';
 import 'package:wanderly/presentation/pages/register_page.dart';
 import 'package:wanderly/core/theme/app_theme.dart';
 import 'package:wanderly/domain/repositories/auth_repository.dart';
+import 'package:wanderly/presentation/bloc/theme/theme_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,20 +29,31 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepositoryProvider<AuthRepository>(
-      create: (context) => AuthRepositoryImpl(supabaseClient),
-      child: BlocProvider(
-        create: (context) =>
-            AuthBloc(authRepository: context.read<AuthRepository>())
-              ..add(CheckAuthStatus()),
-        child: MaterialApp(
-          title: 'Wanderly',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light(),
-          home: const AuthWrapper(),
-          routes: {
-            '/home': (_) => const HomePage(),
-            '/login': (_) => LoginPage(),
-            '/register': (_) => const RegisterPage(),
+      create: (_) => AuthRepositoryImpl(supabaseClient),
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<AuthBloc>(
+            create: (context) =>
+                AuthBloc(authRepository: context.read<AuthRepository>())
+                  ..add(CheckAuthStatus()),
+          ),
+          BlocProvider<ThemeCubit>(create: (_) => ThemeCubit()),
+        ],
+        child: BlocBuilder<ThemeCubit, ThemeMode>(
+          builder: (context, themeMode) {
+            return MaterialApp(
+              title: 'Wanderly',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.light(),
+              darkTheme: AppTheme.dark(),
+              themeMode: themeMode,
+              home: const AuthWrapper(),
+              routes: {
+                '/home': (_) => const HomePage(),
+                '/login': (_) => LoginPage(),
+                '/register': (_) => const RegisterPage(),
+              },
+            );
           },
         ),
       ),

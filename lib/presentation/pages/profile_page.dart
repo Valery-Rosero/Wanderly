@@ -7,6 +7,7 @@ import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:wanderly/presentation/bloc/theme/theme_cubit.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -200,6 +201,32 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Apariencia',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _ThemeModeSelector(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
                         child: Form(
                           key: _formKey,
                           child: Column(
@@ -263,6 +290,35 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+class _ThemeModeSelector extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final mode = context.watch<ThemeCubit>().state;
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ChoiceChip(
+          label: const Text('Claro'),
+          selected: mode == ThemeMode.light,
+          onSelected: (_) => context.read<ThemeCubit>().setLight(),
+        ),
+        ChoiceChip(
+          label: const Text('Oscuro'),
+          selected: mode == ThemeMode.dark,
+          onSelected: (_) => context.read<ThemeCubit>().setDark(),
+        ),
+        ChoiceChip(
+          label: const Text('Automático'),
+          selected: mode == ThemeMode.system,
+          onSelected: (_) => context.read<ThemeCubit>().setSystem(),
+        ),
+      ],
     );
   }
 }

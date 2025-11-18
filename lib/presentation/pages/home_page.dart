@@ -410,16 +410,74 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildBody() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.white, Color(0xFFF3F4F6)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+      decoration: BoxDecoration(
+        gradient: isDark
+            ? const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1F2937)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              )
+            : const LinearGradient(
+                colors: [Colors.white, Color(0xFFF3F4F6)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
       ),
       child: Column(
         children: [
+          // Banner de bienvenida
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF111827) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.accentGradient,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.explore, color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Bienvenido a Wanderly',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Tu compañero de viaje. Pregúntame sobre lugares, rutas y planes.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           if (_errorUbicacion != null && _ubicacionActual == null)
             Container(
               width: double.infinity,
@@ -459,7 +517,7 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         CircularProgressIndicator(),
                         SizedBox(height: 12),
-                        Text('La IA está respondiendo…'),
+                        Text('Wanderly está respondiendo…'),
                       ],
                     ),
                   );
@@ -1117,7 +1175,9 @@ class _HomePageState extends State<HomePage> {
                       ],
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1125,8 +1185,8 @@ class _HomePageState extends State<HomePage> {
                               _routingMode == RoutingMode.driving
                                   ? Icons.directions_car
                                   : _routingMode == RoutingMode.walking
-                                      ? Icons.directions_walk
-                                      : Icons.directions_bike,
+                                  ? Icons.directions_walk
+                                  : Icons.directions_bike,
                               size: 18,
                             ),
                             const SizedBox(width: 6),
@@ -1134,8 +1194,8 @@ class _HomePageState extends State<HomePage> {
                               _routingMode == RoutingMode.driving
                                   ? 'Auto'
                                   : _routingMode == RoutingMode.walking
-                                      ? 'Caminando'
-                                      : 'Bici',
+                                  ? 'Caminando'
+                                  : 'Bici',
                               style: const TextStyle(fontSize: 12),
                             ),
                             const SizedBox(width: 4),
@@ -1177,8 +1237,8 @@ class _HomePageState extends State<HomePage> {
                     _routingMode == RoutingMode.driving
                         ? Icons.directions_car
                         : _routingMode == RoutingMode.walking
-                            ? Icons.directions_walk
-                            : Icons.directions_bike,
+                        ? Icons.directions_walk
+                        : Icons.directions_bike,
                   ),
                 ),
               ),
@@ -1509,7 +1569,7 @@ class _HomePageState extends State<HomePage> {
                       place.address,
                       style: const TextStyle(fontSize: 12),
                       maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
