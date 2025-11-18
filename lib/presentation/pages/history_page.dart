@@ -25,6 +25,9 @@ class _HistoryPageState extends State<HistoryPage> {
   String? _selectedSessionId;
   bool _loading = true;
   String? _error;
+  // Búsqueda y filtros
+  String _searchQuery = '';
+  String _dateFilter = 'all'; // all | today | week | month
 
   @override
   void initState() {
@@ -57,6 +60,31 @@ class _HistoryPageState extends State<HistoryPage> {
         _loading = false;
       });
     }
+  }
+
+  List<ChatSessionEntity> get _filteredSessions {
+    final now = DateTime.now();
+    bool withinFilter(DateTime d) {
+      switch (_dateFilter) {
+        case 'today':
+          return d.year == now.year && d.month == now.month && d.day == now.day;
+        case 'week':
+          return d.isAfter(now.subtract(const Duration(days: 7)));
+        case 'month':
+          return d.isAfter(DateTime(now.year, now.month, 1));
+        default:
+          return true;
+      }
+    }
+
+    return _sessions.where((s) {
+      final date = s.lastMessageAt ?? s.createdAt;
+      final matchesFilter = withinFilter(date);
+      final matchesSearch = _searchQuery.isEmpty
+          ? true
+          : s.title.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesFilter && matchesSearch;
+    }).toList();
   }
 
   Future<void> _loadMessages(String sessionId) async {
@@ -185,16 +213,60 @@ class _HistoryPageState extends State<HistoryPage> {
             )
           : Column(
               children: [
+                // Barra de búsqueda y filtros
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search),
+                          hintText: 'Buscar por título de conversación…',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Todo'),
+                            selected: _dateFilter == 'all',
+                            onSelected: (_) => setState(() => _dateFilter = 'all'),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Hoy'),
+                            selected: _dateFilter == 'today',
+                            onSelected: (_) => setState(() => _dateFilter = 'today'),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Última semana'),
+                            selected: _dateFilter == 'week',
+                            onSelected: (_) => setState(() => _dateFilter = 'week'),
+                          ),
+                          ChoiceChip(
+                            label: const Text('Este mes'),
+                            selected: _dateFilter == 'month',
+                            onSelected: (_) => setState(() => _dateFilter = 'month'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
                 // Lista horizontal de sesiones
                 SizedBox(
                   height: 90,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.all(12),
-                    itemCount: _sessions.length,
+                    itemCount: _filteredSessions.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (_, idx) {
-                      final s = _sessions[idx];
+                      final s = _filteredSessions[idx];
                       final selected = s.id == _selectedSessionId;
                       final subtitle = s.lastMessageAt != null
                           ? _formatDate(s.lastMessageAt!)

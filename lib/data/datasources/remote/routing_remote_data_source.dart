@@ -17,19 +17,23 @@ class RoutingRemoteDataSource {
       RoutingMode.cycling => 'cycling',
     };
     final url = Uri.parse(
-        'https://router.project-osrm.org/route/v1/$profile/$startLon,$startLat;$endLon,$endLat?overview=full&geometries=geojson');
-    final res = await http.get(url, headers: {
-      'User-Agent': 'WanderlyApp/1.0 (+https://wanderly.example)'
-    });
+      'https://router.project-osrm.org/route/v1/$profile/$startLon,$startLat;$endLon,$endLat?overview=full&geometries=geojson',
+    );
+    final res = await http.get(
+      url,
+      headers: {'User-Agent': 'WanderlyApp/1.0 (+https://wanderly.example)'},
+    );
     if (res.statusCode != 200) {
       throw Exception('Routing error: ${res.statusCode}');
     }
     final body = json.decode(res.body) as Map<String, dynamic>;
-    final routes = body['routes'] as List<dynamic>?
-        ?? (throw Exception('No routes in response'));
+    final routes =
+        body['routes'] as List<dynamic>? ??
+        (throw Exception('No routes in response'));
     if (routes.isEmpty) throw Exception('No route found');
-    final geometry = (routes.first as Map<String, dynamic>)['geometry']
-        as Map<String, dynamic>?;
+    final geometry =
+        (routes.first as Map<String, dynamic>)['geometry']
+            as Map<String, dynamic>?;
     if (geometry == null) throw Exception('No geometry');
     final coords = geometry['coordinates'] as List<dynamic>;
     // OSRM returns [lon, lat]; convert to [lat, lon]

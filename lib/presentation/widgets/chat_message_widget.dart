@@ -109,6 +109,30 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
               },
             ),
 
+            if (!isUser) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.copy),
+                  label: const Text('Copiar respuesta'),
+                  onPressed: () async {
+                    await Clipboard.setData(
+                      ClipboardData(text: widget.message.content),
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Respuesta copiada'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+
             // Acciones rápidas para teléfonos y enlaces presentes en el contenido
             ..._buildQuickActions(widget.message.content),
 
@@ -514,56 +538,19 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
 
   // Construye chips de acción para copiar teléfonos y abrir enlaces
   List<Widget> _buildQuickActions(String text) {
+    // Solo mostrar chips para enlaces; eliminar chips de teléfonos
     final urlRegex = RegExp(r'(https?:\/\/[^\s)]+)');
-    final phoneRegex = RegExp(r'(\+?[0-9][0-9\s\-]{6,}[0-9])');
-
     final urls = urlRegex.allMatches(text).map((m) => m.group(0)!).toList();
-    final phones = phoneRegex
-        .allMatches(text)
-        .map((m) => m.group(0)!.trim())
-        .toList();
 
-    final widgets = <Widget>[];
+    if (urls.isEmpty) return [];
 
-    if (phones.isNotEmpty || urls.isNotEmpty) {
-      widgets.add(const SizedBox(height: 8));
-      widgets.add(
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            ...phones.map(
-              (p) => Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ActionChip(
-                    label: Text('Llamar $p'),
-                    avatar: const Icon(Icons.phone, size: 16),
-                    onPressed: () {
-                      final uri = Uri.parse(
-                        'tel:${p.replaceAll(' ', '').replaceAll('-', '')}',
-                      );
-                      launchUrl(uri);
-                    },
-                  ),
-                  IconButton(
-                    tooltip: 'Copiar número',
-                    icon: const Icon(Icons.copy, size: 18),
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: p));
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Número copiado al portapapeles'),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            ...urls.map(
+    return [
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: urls
+            .map(
               (u) => ActionChip(
                 label: const Text('Abrir enlace'),
                 avatar: const Icon(Icons.link, size: 16),
@@ -571,13 +558,10 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                   launchUrl(Uri.parse(u), mode: LaunchMode.externalApplication);
                 },
               ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return widgets;
+            )
+            .toList(),
+      ),
+    ];
   }
 
   // Helper method to get appropriate icon for place type

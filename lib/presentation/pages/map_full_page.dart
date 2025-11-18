@@ -232,8 +232,8 @@ class _MapFullPageState extends State<MapFullPage> {
                       color: _mode == RoutingMode.driving
                           ? Colors.deepPurple
                           : (_mode == RoutingMode.walking
-                              ? Colors.green
-                              : Colors.orange),
+                                ? Colors.green
+                                : Colors.orange),
                     ),
                   ],
                 ),
@@ -291,7 +291,9 @@ class _MapFullPageState extends State<MapFullPage> {
                   ],
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -299,8 +301,8 @@ class _MapFullPageState extends State<MapFullPage> {
                           _mode == RoutingMode.driving
                               ? Icons.directions_car
                               : _mode == RoutingMode.walking
-                                  ? Icons.directions_walk
-                                  : Icons.directions_bike,
+                              ? Icons.directions_walk
+                              : Icons.directions_bike,
                           size: 18,
                         ),
                         const SizedBox(width: 6),
@@ -308,8 +310,8 @@ class _MapFullPageState extends State<MapFullPage> {
                           _mode == RoutingMode.driving
                               ? 'Auto'
                               : _mode == RoutingMode.walking
-                                  ? 'Caminando'
-                                  : 'Bici',
+                              ? 'Caminando'
+                              : 'Bici',
                           style: const TextStyle(fontSize: 12),
                         ),
                         const SizedBox(width: 4),
@@ -351,8 +353,8 @@ class _MapFullPageState extends State<MapFullPage> {
                 _mode == RoutingMode.driving
                     ? Icons.directions_car
                     : _mode == RoutingMode.walking
-                        ? Icons.directions_walk
-                        : Icons.directions_bike,
+                    ? Icons.directions_walk
+                    : Icons.directions_bike,
               ),
             ),
           ),
