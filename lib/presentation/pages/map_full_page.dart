@@ -181,16 +181,6 @@ class _MapFullPageState extends State<MapFullPage> {
                   ],
                 ),
               ),
-              PopupMenuItem(
-                value: RoutingMode.cycling,
-                child: Row(
-                  children: const [
-                    Icon(Icons.pedal_bike),
-                    SizedBox(width: 8),
-                    Text('Bici'),
-                  ],
-                ),
-              ),
             ],
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 8.0),
@@ -231,9 +221,7 @@ class _MapFullPageState extends State<MapFullPage> {
                       strokeWidth: 4,
                       color: _mode == RoutingMode.driving
                           ? Colors.deepPurple
-                          : (_mode == RoutingMode.walking
-                                ? Colors.green
-                                : Colors.orange),
+                          : Colors.green,
                     ),
                   ],
                 ),
@@ -278,16 +266,6 @@ class _MapFullPageState extends State<MapFullPage> {
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
-                      value: RoutingMode.cycling,
-                      child: Row(
-                        children: [
-                          Icon(Icons.directions_bike),
-                          SizedBox(width: 8),
-                          Text('Bici'),
-                        ],
-                      ),
-                    ),
                   ],
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -300,18 +278,12 @@ class _MapFullPageState extends State<MapFullPage> {
                         Icon(
                           _mode == RoutingMode.driving
                               ? Icons.directions_car
-                              : _mode == RoutingMode.walking
-                              ? Icons.directions_walk
-                              : Icons.directions_bike,
+                              : Icons.directions_walk,
                           size: 18,
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          _mode == RoutingMode.driving
-                              ? 'Auto'
-                              : _mode == RoutingMode.walking
-                              ? 'Caminando'
-                              : 'Bici',
+                          _mode == RoutingMode.driving ? 'Auto' : 'Caminando',
                           style: const TextStyle(fontSize: 12),
                         ),
                         const SizedBox(width: 4),
@@ -352,9 +324,7 @@ class _MapFullPageState extends State<MapFullPage> {
               child: Icon(
                 _mode == RoutingMode.driving
                     ? Icons.directions_car
-                    : _mode == RoutingMode.walking
-                    ? Icons.directions_walk
-                    : Icons.directions_bike,
+                    : Icons.directions_walk,
               ),
             ),
           ),
@@ -371,8 +341,6 @@ class _MapFullPageState extends State<MapFullPage> {
           _mode = RoutingMode.walking;
           break;
         case RoutingMode.walking:
-          _mode = RoutingMode.cycling;
-          break;
         case RoutingMode.cycling:
           _mode = RoutingMode.driving;
           break;
