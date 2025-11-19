@@ -496,15 +496,17 @@ class _HomePageState extends State<HomePage> {
 
                             final titleStyle = theme.textTheme.headlineSmall
                                 ?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? Colors.white.withOpacity(0.95)
-                                  : Colors.black87,
-                            );
-                            final subtitleStyle =
-                                theme.textTheme.bodyMedium?.copyWith(
-                              color: isDark ? Colors.white70 : Colors.black54,
-                            );
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? Colors.white.withOpacity(0.95)
+                                      : Colors.black87,
+                                );
+                            final subtitleStyle = theme.textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.black54,
+                                );
 
                             return Column(
                               mainAxisSize: MainAxisSize.min,
@@ -603,16 +605,15 @@ class _HomePageState extends State<HomePage> {
 
                           final titleStyle = theme.textTheme.headlineSmall
                               ?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: isDark
-                                ? Colors.white.withOpacity(0.95)
-                                : Colors.black87,
-                          );
-                          final subtitleStyle =
-                              theme.textTheme.bodyMedium?.copyWith(
-                            color:
-                                isDark ? Colors.white70 : Colors.black54,
-                          );
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? Colors.white.withOpacity(0.95)
+                                    : Colors.black87,
+                              );
+                          final subtitleStyle = theme.textTheme.bodyMedium
+                              ?.copyWith(
+                                color: isDark ? Colors.white70 : Colors.black54,
+                              );
 
                           return Column(
                             mainAxisSize: MainAxisSize.min,
@@ -800,6 +801,20 @@ class _HomePageState extends State<HomePage> {
     final userName = authState is AuthAuthenticated
         ? (authState.user.name ?? authState.user.email)
         : 'Invitado';
+    final userAvatarUrl = authState is AuthAuthenticated
+        ? authState.user.profilePicture
+        : null;
+    String? displayAvatarUrl;
+    if (userAvatarUrl != null && userAvatarUrl.isNotEmpty) {
+      final hasV = userAvatarUrl.contains('v=');
+      final hasToken = userAvatarUrl.contains('token=');
+      if (hasV || hasToken) {
+        displayAvatarUrl = userAvatarUrl;
+      } else {
+        final sep = userAvatarUrl.contains('?') ? '&' : '?';
+        displayAvatarUrl = '$userAvatarUrl${sep}cb=${userAvatarUrl.hashCode}';
+      }
+    }
     final hasLocation = _ubicacionActual != null;
 
     return Drawer(
@@ -813,13 +828,31 @@ class _HomePageState extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  const Text(
-                    'Wanderly',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        key: ValueKey(displayAvatarUrl ?? 'empty'),
+                        radius: 22,
+                        backgroundColor: Colors.white24,
+                        backgroundImage:
+                            (displayAvatarUrl != null && displayAvatarUrl.isNotEmpty)
+                            ? NetworkImage(displayAvatarUrl)
+                            : null,
+                        child: (displayAvatarUrl == null || displayAvatarUrl.isEmpty)
+                            ? const Icon(Icons.person, color: Colors.white)
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Wanderly',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(userName, style: const TextStyle(color: Colors.white70)),
@@ -862,7 +895,9 @@ class _HomePageState extends State<HomePage> {
                 if (!_chatInicializado) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Preparando el chat… intenta de nuevo en un momento'),
+                      content: Text(
+                        'Preparando el chat… intenta de nuevo en un momento',
+                      ),
                       duration: Duration(seconds: 2),
                     ),
                   );
@@ -874,7 +909,9 @@ class _HomePageState extends State<HomePage> {
                 if (state is! AuthAuthenticated) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Primero inicia sesión para ver tu historial'),
+                      content: Text(
+                        'Primero inicia sesión para ver tu historial',
+                      ),
                       duration: Duration(seconds: 2),
                     ),
                   );
@@ -886,10 +923,8 @@ class _HomePageState extends State<HomePage> {
                   final result = await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => HistoryPage(
-                        chatRepository: _chatRepo,
-                        userId: uid,
-                      ),
+                      builder: (_) =>
+                          HistoryPage(chatRepository: _chatRepo, userId: uid),
                     ),
                   );
                   if (result is Map && result['newSessionId'] != null) {

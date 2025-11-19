@@ -20,20 +20,12 @@ class AvatarStorageDataSource {
           bytes,
           fileOptions: const FileOptions(upsert: true, contentType: 'image/png'),
         );
-
-    // Try public URL first; if bucket is private, generate a signed one.
+    // Política del bucket permite lectura pública; usar URL pública estable
+    // y añadir un parámetro de versión para bustear caché del navegador.
     final publicUrl = _supabase.storage.from(bucket).getPublicUrl(path);
-    if (publicUrl.isNotEmpty) return publicUrl;
-
-    try {
-      final signed = await _supabase.storage.from(bucket).createSignedUrl(
-            path,
-            60 * 60 * 24 * 30, // 30 days
-          );
-      return signed;
-    } catch (_) {
-      return null;
-    }
+    if (publicUrl.isEmpty) return null;
+    final version = DateTime.now().millisecondsSinceEpoch;
+    return '$publicUrl?v=$version';
   }
 
   /// Deletes the user's avatar file.

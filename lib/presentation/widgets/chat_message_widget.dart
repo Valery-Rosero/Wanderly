@@ -122,7 +122,10 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
               onTapLink: (text, href, title) {
                 if (href == null) return;
                 // Abre enlaces externos; mantiene chips rápidos para teléfonos aparte
-                launchUrl(Uri.parse(href), mode: LaunchMode.externalApplication);
+                launchUrl(
+                  Uri.parse(href),
+                  mode: LaunchMode.externalApplication,
+                );
               },
             ),
 
@@ -188,7 +191,9 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                               color: isDark ? scheme.surface : Colors.white,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: isDark ? Colors.white10 : Colors.grey.shade200,
+                                color: isDark
+                                    ? Colors.white10
+                                    : Colors.grey.shade200,
                               ),
                               boxShadow: [
                                 if (!isDark)
@@ -250,7 +255,9 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                           place.address,
                                           style: TextStyle(
                                             fontSize: 11,
-                                            color: isDark ? Colors.white70 : Colors.grey.shade600,
+                                            color: isDark
+                                                ? Colors.white70
+                                                : Colors.grey.shade600,
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -267,7 +274,9 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                       tooltip: 'Ver en mapa',
                                       icon: Icon(
                                         Icons.location_on,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
                                       ),
                                       onPressed: () =>
                                           widget.onPlaceTap?.call(place),
@@ -291,7 +300,9 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                         tooltip: 'Copiar número',
                                         icon: Icon(
                                           Icons.copy,
-                                          color: isDark ? Colors.white70 : Colors.black87,
+                                          color: isDark
+                                              ? Colors.white70
+                                              : Colors.black87,
                                         ),
                                         onPressed: () async {
                                           await Clipboard.setData(
@@ -317,7 +328,9 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                         tooltip: 'Abrir sitio web',
                                         icon: Icon(
                                           Icons.open_in_new,
-                                          color: Theme.of(context).colorScheme.secondary,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.secondary,
                                         ),
                                         onPressed: () {
                                           final url = place.website!;
@@ -393,11 +406,16 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                   width: 24,
                                   height: 24,
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).colorScheme.tertiary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.tertiary,
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Theme.of(context).colorScheme.tertiary.withOpacity(0.35),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .tertiary
+                                            .withOpacity(0.35),
                                         blurRadius: 6,
                                         offset: const Offset(0, 2),
                                       ),
@@ -426,7 +444,9 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                 margin: const EdgeInsets.only(top: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondary.withOpacity(0.20),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.secondary.withOpacity(0.20),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -456,25 +476,29 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
 
     String? userAvatarUrl;
     if (isUser) {
-      final authState = context.read<AuthBloc>().state;
+      // Observar cambios de autenticación para refrescar avatar cuando se actualiza en perfil
+      final authState = context.watch<AuthBloc>().state;
       if (authState is AuthAuthenticated) {
         userAvatarUrl = authState.user.profilePicture;
       }
     }
 
+    String? _displayUrl;
+    if (userAvatarUrl != null && userAvatarUrl!.isNotEmpty) {
+      _displayUrl = _withCacheBust(userAvatarUrl!);
+    }
+
     final avatar = CircleAvatar(
+      key: ValueKey(isUser ? (_displayUrl ?? 'empty') : 'bot'),
       backgroundColor: isUser
           ? (isDark ? Colors.white24 : Colors.grey.shade300)
           : Theme.of(context).colorScheme.primary,
       backgroundImage:
-          isUser && (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
-              ? NetworkImage(userAvatarUrl!)
-              : null,
-      child: (userAvatarUrl == null || userAvatarUrl!.isEmpty)
-          ? Icon(
-              isUser ? Icons.person : Icons.smart_toy,
-              color: Colors.white,
-            )
+          isUser && (_displayUrl != null && _displayUrl!.isNotEmpty)
+          ? NetworkImage(_displayUrl!)
+          : null,
+      child: (_displayUrl == null || _displayUrl!.isEmpty)
+          ? Icon(isUser ? Icons.person : Icons.smart_toy, color: Colors.white)
           : null,
     );
 
@@ -640,5 +664,15 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
       default:
         return Icons.place;
     }
+  }
+
+  // Añade un parámetro de cache-bust si la URL no tiene ya 'v=' o 'token='
+  String _withCacheBust(String url) {
+    final hasV = url.contains('v=');
+    final hasToken = url.contains('token=');
+    if (hasV || hasToken) return url;
+    final sep = url.contains('?') ? '&' : '?';
+    final key = url.hashCode; // estable para misma URL
+    return '$url${sep}cb=$key';
   }
 }

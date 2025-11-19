@@ -104,28 +104,50 @@ class AuthRepositoryImpl implements AuthRepository {
       try {
         final response = await _supabase
             .from('users')
-            .select('id, first_name, profile_picture')
+            .select('id, first_name, last_name, profile_picture')
             .eq('id', user.id)
             .maybeSingle();
 
-        final name = (response != null
-                ? response['first_name'] as String?
-                : null) ??
-            (user.userMetadata?['full_name'] as String?);
+        final firstName = response != null
+            ? response['first_name'] as String?
+            : null;
+        final lastName = response != null
+            ? response['last_name'] as String?
+            : null;
+        String? combined;
+        final f = firstName?.trim();
+        final l = lastName?.trim();
+        if ((f != null && f.isNotEmpty) || (l != null && l.isNotEmpty)) {
+          combined = [f, l]
+              .where((s) => s != null && s!.isNotEmpty)
+              .map((s) => s!)
+              .join(' ');
+        }
+        final name = combined ?? (user.userMetadata?['full_name'] as String?);
 
+        final stored = response?['profile_picture'] as String?;
+        final fallbackAvatar = _supabase.storage
+            .from('avatars')
+            .getPublicUrl('${user.id}/avatar.png');
+        final profileUrl = (stored != null && stored.isNotEmpty)
+            ? stored
+            : (fallbackAvatar.isNotEmpty ? fallbackAvatar : null);
         return UserEntity(
           id: user.id,
           email: user.email ?? '',
           name: name,
-          profilePicture: response?['profile_picture'] as String?,
+          profilePicture: profileUrl,
           createdAt: DateTime.now(),
         );
       } catch (_) {
+        final fallbackAvatar = _supabase.storage
+            .from('avatars')
+            .getPublicUrl('${user.id}/avatar.png');
         return UserEntity(
           id: user.id,
           email: user.email ?? '',
           name: user.userMetadata?['full_name'] as String?,
-          profilePicture: null,
+          profilePicture: (fallbackAvatar.isNotEmpty ? fallbackAvatar : null),
           createdAt: DateTime.now(),
         );
       }
@@ -139,27 +161,45 @@ class AuthRepositoryImpl implements AuthRepository {
       if (user != null) {
         final response = await _supabase
             .from('users')
-            .select('id, first_name, profile_picture')
+            .select('id, first_name, last_name, profile_picture')
             .eq('id', user.id)
             .maybeSingle();
 
         if (response != null) {
           // Build entity using row data + fallback to auth email
+          final firstName = response['first_name'] as String?;
+          final lastName = response['last_name'] as String?;
+          final f = firstName?.trim();
+          final l = lastName?.trim();
+          final combined = ((f != null && f.isNotEmpty) || (l != null && l.isNotEmpty))
+              ? [f, l]
+                  .where((s) => s != null && s!.isNotEmpty)
+                  .map((s) => s!)
+                  .join(' ')
+              : null;
+          final stored = response['profile_picture'] as String?;
+          final fallbackAvatar = _supabase.storage
+              .from('avatars')
+              .getPublicUrl('${user.id}/avatar.png');
+          final profileUrl = (stored != null && stored.isNotEmpty)
+              ? stored
+              : (fallbackAvatar.isNotEmpty ? fallbackAvatar : null);
           return UserEntity(
             id: response['id'] as String? ?? user.id,
             email: user.email ?? '',
-            name:
-                response['first_name'] as String? ??
-                (user.userMetadata?['full_name'] as String?),
-            profilePicture: response['profile_picture'] as String?,
+            name: combined ?? (user.userMetadata?['full_name'] as String?),
+            profilePicture: profileUrl,
             createdAt: DateTime.now(),
           );
         } else {
+          final fallbackAvatar = _supabase.storage
+              .from('avatars')
+              .getPublicUrl('${user.id}/avatar.png');
           return UserEntity(
             id: user.id,
             email: user.email ?? '',
             name: user.userMetadata?['full_name'] as String?,
-            profilePicture: null,
+            profilePicture: (fallbackAvatar.isNotEmpty ? fallbackAvatar : null),
             createdAt: DateTime.now(),
           );
         }

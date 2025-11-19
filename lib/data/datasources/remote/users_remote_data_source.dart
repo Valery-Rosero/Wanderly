@@ -34,9 +34,18 @@ class UsersRemoteDataSource {
 
     // Mantener sincronizado el nombre también en el metadata del usuario
     try {
+      final f = perfil.name?.trim();
+      final l = perfil.lastName?.trim();
+      final combined = ((f != null && f.isNotEmpty) || (l != null && l.isNotEmpty))
+          ? [f, l]
+              .where((s) => s != null && s!.isNotEmpty)
+              .map((s) => s!)
+              .join(' ')
+          : (perfil.name ?? '');
+
       await _supabase.auth.updateUser(
         UserAttributes(data: {
-          'full_name': perfil.name,
+          'full_name': combined,
         }),
       );
     } catch (_) {

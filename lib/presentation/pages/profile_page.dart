@@ -225,6 +225,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Observar AuthBloc para disponer del avatar actual incluso antes de cargar _avatarUrl
+    final authState = context.watch<AuthBloc>().state;
+    final effectiveAvatarUrl = (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+        ? _avatarUrl!
+        : (authState is AuthAuthenticated ? authState.user.profilePicture : null);
     return Scaffold(
       appBar: AppBar(title: const Text('Perfil')),
       body: _loading
@@ -252,12 +257,13 @@ class _ProfilePageState extends State<ProfilePage> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         CircleAvatar(
+                          key: ValueKey(effectiveAvatarUrl ?? 'empty'),
                           radius: 20,
                           backgroundColor: Colors.white24,
-                          backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
-                              ? NetworkImage(_avatarUrl!)
+                          backgroundImage: (effectiveAvatarUrl != null && effectiveAvatarUrl.isNotEmpty)
+                              ? NetworkImage(effectiveAvatarUrl)
                               : null,
-                          child: (_avatarUrl == null || _avatarUrl!.isEmpty)
+                          child: (effectiveAvatarUrl == null || effectiveAvatarUrl.isEmpty)
                               ? const Icon(Icons.person, color: Colors.white)
                               : null,
                         ),
