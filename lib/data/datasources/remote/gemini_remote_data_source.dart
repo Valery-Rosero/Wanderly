@@ -1,15 +1,16 @@
 import 'dart:async';
 
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GeminiRemoteDataSource {
   final GenerativeModel _model;
 
   GeminiRemoteDataSource()
     : _model = GenerativeModel(
-        // Usar un modelo ampliamente soportado para evitar incompatibilidades
-        model: 'gemini-2.0-flash',
-        apiKey: 'AIzaSyDUe84YZlDVZs-9vAtOLFEks0yZXoFs7ro', // TODO: mover a .env
+        // Modelo por defecto; puede sobreescribirse con GEMINI_MODEL en .env
+        model: (dotenv.env['GEMINI_MODEL'] ?? 'gemini-2.0-flash'),
+        apiKey: (dotenv.env['GEMINI_API_KEY'] ?? ''),
       );
 
   Future<String> obtenerRecomendacion({
@@ -18,6 +19,9 @@ class GeminiRemoteDataSource {
     required double longitude,
   }) async {
     try {
+      if ((dotenv.env['GEMINI_API_KEY'] ?? '').isEmpty) {
+        throw Exception('Falta GEMINI_API_KEY en .env');
+      }
       final prompt =
           '''
 🔍 CONTEXTO DEL USUARIO:

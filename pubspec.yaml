@@ -57,10 +57,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # 📦 Si vas a agregar imágenes o fuentes personalizadas, descomenta y ajusta:
-  # assets:
-  #   - assets/images/
-  #   - assets/icons/
+  # 📦 Assets
+  assets:
+    - .env
 
   # fonts:
   #   - family: Schyler

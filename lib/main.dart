@@ -10,11 +10,15 @@ import 'package:wanderly/presentation/pages/register_page.dart';
 import 'package:wanderly/core/theme/app_theme.dart';
 import 'package:wanderly/domain/repositories/auth_repository.dart';
 import 'package:wanderly/presentation/bloc/theme/theme_cubit.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializar Supabase PRIMERO
+  // Cargar variables de entorno
+  await dotenv.load(fileName: '.env');
+
+  // Inicializar Supabase PRIMERO con variables desde .env
   await SupabaseConfig.initialize();
 
   runApp(MyApp());
