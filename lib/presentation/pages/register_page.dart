@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wanderly/core/theme/app_theme.dart';
 import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+import 'package:wanderly/data/datasources/remote/avatar_storage_data_source.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -16,10 +21,30 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController nameController = TextEditingController();
 
   String? _errorMessage;
+  Uint8List? _avatarBytes;
 
   bool _isValidEmail(String email) {
     final regex = RegExp(r"^[^\s@]+@[^\s@]+\.[^\s@]+$");
     return regex.hasMatch(email);
+  }
+
+  Future<void> _pickAvatar() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final img = frame.image;
+      if (img.width != img.height) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selecciona una imagen cuadrada (1:1)')),
+        );
+        return;
+      }
+    } catch (_) {}
+    setState(() => _avatarBytes = bytes);
   }
 
   void _submit(BuildContext context) {
@@ -101,8 +126,31 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: BlocConsumer<AuthBloc, AuthState>(
                         listener: (context, state) {
                           if (state is AuthAuthenticated) {
-                            // Navegar a Home y evitar volver a registro
-                            Navigator.pushReplacementNamed(context, '/home');
+                            // Si hay avatar seleccionado, subirlo y actualizar perfil
+                            Future(() async {
+                              try {
+                                if (_avatarBytes != null) {
+                                  final storage = AvatarStorageDataSource(sb.Supabase.instance.client);
+                                  final url = await storage.uploadAvatar(
+                                    userId: state.user.id,
+                                    bytes: _avatarBytes!,
+                                  );
+                                  if (url != null) {
+                                    await sb.Supabase.instance.client
+                                        .from('users')
+                                        .update({'profile_picture': url})
+                                        .eq('id', state.user.id);
+                                  }
+                                }
+                              } catch (e) {
+                                // Fallar silenciosamente: priorizar navegación al Home
+                                // ignore: avoid_print
+                                print('Error subiendo/actualizando avatar: $e');
+                              } finally {
+                                if (!mounted) return;
+                                Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+                              }
+                            });
                           } else if (state is AuthError) {
                             setState(() => _errorMessage = state.message);
                           }
@@ -113,6 +161,41 @@ class _RegisterPageState extends State<RegisterPage> {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
+                              Wrap(
+                                spacing: 12,
+                                runSpacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 28,
+                                    backgroundColor: Colors.grey.shade300,
+                                    backgroundImage: _avatarBytes != null
+                                        ? MemoryImage(_avatarBytes!)
+                                        : null,
+                                    child: _avatarBytes == null
+                                        ? const Icon(Icons.person, color: Colors.white)
+                                        : null,
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: isLoading ? null : _pickAvatar,
+                                    icon: const Icon(Icons.camera_alt),
+                                    label: const Text(
+                                      'Agregar foto (1:1 opcional)',
+                                      softWrap: true,
+                                      overflow: TextOverflow.visible,
+                                    ),
+                                  ),
+                                  if (_avatarBytes != null)
+                                    TextButton.icon(
+                                      onPressed: isLoading
+                                          ? null
+                                          : () => setState(() => _avatarBytes = null),
+                                      icon: const Icon(Icons.delete_outline),
+                                      label: const Text('Quitar'),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
                               TextField(
                                 controller: nameController,
                                 decoration: const InputDecoration(

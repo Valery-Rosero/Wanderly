@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:wanderly/core/theme/app_theme.dart';
+import 'package:wanderly/presentation/bloc/auth/auth_bloc.dart';
 
 class ChatMessageWidget extends StatefulWidget {
   final ChatMessageEntity message;
@@ -30,13 +31,14 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final isUser = widget.message.isUser;
     final bubbleColor = isUser
-        ? Colors.white
-        : Theme.of(context).colorScheme.primary.withOpacity(0.08);
-    final labelColor = isUser
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.primary;
+        ? (isDark ? const Color(0xFF243B5A) : scheme.primary.withOpacity(0.12))
+        : (isDark ? scheme.surface : Colors.white);
+    final labelColor = scheme.secondary;
 
     final bubble = ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 600),
@@ -46,14 +48,19 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
           color: bubbleColor,
           borderRadius: BorderRadius.circular(16),
           border: isUser
-              ? Border.all(color: Colors.grey.shade300)
-              : Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.20)),
+              ? Border.all(
+                  color: isDark
+                      ? const Color(0xFF3B5B83)
+                      : scheme.primary.withOpacity(0.28),
+                )
+              : Border.all(color: scheme.primary.withOpacity(0.20)),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
           ],
         ),
         child: Column(
@@ -83,23 +90,32 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
             // Renderizado Markdown bonito para títulos, listas y enlaces
             MarkdownBody(
               data: widget.message.content,
-              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                h1: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
+              styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+                h1: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? scheme.secondary : scheme.primary,
                 ),
-                h2: Theme.of(context).textTheme.titleMedium?.copyWith(
+                h2: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
+                  color: isDark ? scheme.secondary : scheme.primary,
                 ),
-                h3: Theme.of(context).textTheme.titleSmall?.copyWith(
+                h3: theme.textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w700,
+                  color: isDark ? scheme.secondary : scheme.primary,
                 ),
-                p: Theme.of(context).textTheme.bodyMedium,
+                strong: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : null,
+                ),
+                p: theme.textTheme.bodyMedium?.copyWith(
+                  color: isDark ? Colors.white.withOpacity(0.95) : null,
+                ),
                 listBullet: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w600,
+                  color: isDark ? scheme.secondary : scheme.primary,
+                  fontWeight: FontWeight.w700,
                 ),
                 blockquoteDecoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.06),
+                  color: scheme.primary.withOpacity(isDark ? 0.12 : 0.06),
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
@@ -169,15 +185,18 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: isDark ? scheme.surface : Colors.white,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey.shade200),
+                              border: Border.all(
+                                color: isDark ? Colors.white10 : Colors.grey.shade200,
+                              ),
                               boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.02),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
+                                if (!isDark)
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.02),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
                               ],
                             ),
                             child: Row(
@@ -231,7 +250,7 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                           place.address,
                                           style: TextStyle(
                                             fontSize: 11,
-                                            color: Colors.grey.shade600,
+                                            color: isDark ? Colors.white70 : Colors.grey.shade600,
                                           ),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -270,9 +289,9 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
                                       ),
                                       IconButton(
                                         tooltip: 'Copiar número',
-                                        icon: const Icon(
+                                        icon: Icon(
                                           Icons.copy,
-                                          color: Colors.black87,
+                                          color: isDark ? Colors.white70 : Colors.black87,
                                         ),
                                         onPressed: () async {
                                           await Clipboard.setData(
@@ -435,14 +454,28 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
       ),
     );
 
+    String? userAvatarUrl;
+    if (isUser) {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        userAvatarUrl = authState.user.profilePicture;
+      }
+    }
+
     final avatar = CircleAvatar(
       backgroundColor: isUser
-          ? Colors.grey.shade300
+          ? (isDark ? Colors.white24 : Colors.grey.shade300)
           : Theme.of(context).colorScheme.primary,
-      child: Icon(
-        isUser ? Icons.person : Icons.smart_toy,
-        color: isUser ? Colors.white : Colors.white,
-      ),
+      backgroundImage:
+          isUser && (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
+              ? NetworkImage(userAvatarUrl!)
+              : null,
+      child: (userAvatarUrl == null || userAvatarUrl!.isEmpty)
+          ? Icon(
+              isUser ? Icons.person : Icons.smart_toy,
+              color: Colors.white,
+            )
+          : null,
     );
 
     return Container(

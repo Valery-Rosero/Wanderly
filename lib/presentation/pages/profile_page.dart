@@ -8,6 +8,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:wanderly/presentation/bloc/theme/theme_cubit.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:ui' as ui;
+import 'package:wanderly/data/datasources/remote/avatar_storage_data_source.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -26,6 +29,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _toSave = false;
   late List<String> _cities;
   String? _selectedCity;
+  String? _avatarUrl;
 
   String _toTitleCase(String input) {
     final trimmed = input.trim();
@@ -84,8 +88,75 @@ class _ProfilePageState extends State<ProfilePage> {
           await local.upsertProfile(rp, markSynced: true);
         }
       }
+
+      // Leer avatar actual desde la tabla users
+      try {
+        final row = await Supabase.instance.client
+            .from('users')
+            .select('profile_picture')
+            .eq('id', userId)
+            .maybeSingle();
+        _avatarUrl = (row?['profile_picture'] as String?);
+      } catch (_) {}
     } catch (_) {}
     setState(() => _loading = false);
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return;
+    final userId = authState.user.id;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (picked == null) return;
+
+    // Validar que sea 1:1
+    final bytes = await picked.readAsBytes();
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final img = frame.image;
+      if (img.width != img.height) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selecciona una imagen cuadrada (1:1)')),
+        );
+        return;
+      }
+    } catch (_) {}
+
+    final storage = AvatarStorageDataSource(Supabase.instance.client);
+    final url = await storage.uploadAvatar(userId: userId, bytes: bytes);
+    if (url == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo subir la foto')),
+        );
+      }
+      return;
+    }
+
+    await Supabase.instance.client
+        .from('users')
+        .update({'profile_picture': url})
+        .eq('id', userId);
+
+    setState(() => _avatarUrl = url);
+    context.read<AuthBloc>().add(CheckAuthStatus());
+  }
+
+  Future<void> _deleteAvatar() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return;
+    final userId = authState.user.id;
+    final storage = AvatarStorageDataSource(Supabase.instance.client);
+    await storage.deleteAvatar(userId);
+    await Supabase.instance.client
+        .from('users')
+        .update({'profile_picture': null})
+        .eq('id', userId);
+    setState(() => _avatarUrl = null);
+    context.read<AuthBloc>().add(CheckAuthStatus());
   }
 
   Future<void> _guardar() async {
@@ -135,6 +206,8 @@ class _ProfilePageState extends State<ProfilePage> {
       if (local != null) {
         await local.upsertProfile(perfil, markSynced: true);
       }
+      // Refrescar estado de autenticación para propagar nombre desde Supabase
+      context.read<AuthBloc>().add(CheckAuthStatus());
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -173,15 +246,22 @@ class _ProfilePageState extends State<ProfilePage> {
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    child: Row(
-                      children: const [
-                        Icon(
-                          Icons.person_pin_circle,
-                          color: Colors.white,
-                          size: 32,
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Colors.white24,
+                          backgroundImage: (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                              ? NetworkImage(_avatarUrl!)
+                              : null,
+                          child: (_avatarUrl == null || _avatarUrl!.isEmpty)
+                              ? const Icon(Icons.person, color: Colors.white)
+                              : null,
                         ),
-                        SizedBox(width: 12),
-                        Text(
+                        const Text(
                           'Tu perfil',
                           style: TextStyle(
                             color: Colors.white,
@@ -189,6 +269,25 @@ class _ProfilePageState extends State<ProfilePage> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                        TextButton.icon(
+                          onPressed: _pickAndUploadAvatar,
+                          icon: const Icon(Icons.camera_alt, color: Colors.white),
+                          label: const Text(
+                            'Cambiar foto',
+                            style: TextStyle(color: Colors.white),
+                            softWrap: true,
+                            overflow: TextOverflow.visible,
+                          ),
+                        ),
+                        if (_avatarUrl != null)
+                          TextButton.icon(
+                            onPressed: _deleteAvatar,
+                            icon: const Icon(Icons.delete_outline, color: Colors.white),
+                            label: const Text(
+                              'Eliminar',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
                       ],
                     ),
                   ),

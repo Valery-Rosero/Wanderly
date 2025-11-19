@@ -6,6 +6,10 @@ class SupabaseConfig {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpZXF4emhybnp0ZnNydXZudWFoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMyOTE5NDAsImV4cCI6MjA3ODg2Nzk0MH0.rxIV77Au9LuC93tzBT85udbDGwZ6EEBNohQysoUO36I';
 
   static Future<void> initialize() async {
-    await Supabase.initialize(url: url, anonKey: anonKey);
+    await Supabase.initialize(
+      url: url,
+      anonKey: anonKey,
+      debug: true,
+    );
   }
 }

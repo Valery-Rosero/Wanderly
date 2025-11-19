@@ -193,7 +193,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(AuthLoading());
     try {
-      final user = await authRepository.getUsuarioActual();
+      // Intentar primero obtener usuario desde el stream (permite restauración de sesión al iniciar).
+      UserEntity? fromStream;
+      try {
+        fromStream = await authRepository.currentUser
+            .firstWhere((u) => u != null)
+            .timeout(const Duration(seconds: 2), onTimeout: () => null);
+      } catch (_) {
+        fromStream = null;
+      }
+
+      final user = fromStream ?? await authRepository.getUsuarioActual();
       if (user != null) {
         emit(AuthAuthenticated(user));
       } else {

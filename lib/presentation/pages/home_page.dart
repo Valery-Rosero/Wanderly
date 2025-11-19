@@ -427,57 +427,8 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Column(
         children: [
-          // Banner de bienvenida
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF111827) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.accentGradient,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.explore, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Bienvenido a Wanderly',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Tu compañero de viaje. Pregúntame sobre lugares, rutas y planes.',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Se elimina el banner superior; el saludo se muestra centrado en el chat
+          const SizedBox(height: 8),
           if (_errorUbicacion != null && _ubicacionActual == null)
             Container(
               width: double.infinity,
@@ -524,6 +475,60 @@ class _HomePageState extends State<HomePage> {
                 } else if (state is ChatLoaded) {
                   final mensajes = state.messages;
                   _focusLastUserMessageSoon();
+                  // Si el historial está vacío, mostrar el texto de bienvenida centrado.
+                  if (mensajes.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Builder(
+                          builder: (context) {
+                            final theme = Theme.of(context);
+                            final isDark = theme.brightness == Brightness.dark;
+                            final authState = context.watch<AuthBloc>().state;
+                            String? name;
+                            if (authState is AuthAuthenticated) {
+                              final user = authState.user;
+                              final candidate = (user.name ?? '').trim();
+                              name = candidate.isNotEmpty
+                                  ? candidate
+                                  : user.email.split('@').first;
+                            }
+
+                            final titleStyle = theme.textTheme.headlineSmall
+                                ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? Colors.white.withOpacity(0.95)
+                                  : Colors.black87,
+                            );
+                            final subtitleStyle =
+                                theme.textTheme.bodyMedium?.copyWith(
+                              color: isDark ? Colors.white70 : Colors.black54,
+                            );
+
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  name != null
+                                      ? 'Bienvenido, $name'
+                                      : 'Bienvenido a Wanderly',
+                                  textAlign: TextAlign.center,
+                                  style: titleStyle,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Tu compañero de viaje. Pregúntame sobre lugares, rutas y planes.',
+                                  textAlign: TextAlign.center,
+                                  style: subtitleStyle,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  }
                   // Índice del último mensaje enviado por el usuario
                   int lastUserIndex = -1;
                   for (int i = mensajes.length - 1; i >= 0; i--) {
@@ -579,18 +584,56 @@ class _HomePageState extends State<HomePage> {
                     ),
                   );
                 } else if (state is ChatInitial) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_rounded,
-                          size: 50,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 12),
-                        Text('Escribe a la IA para obtener recomendaciones'),
-                      ],
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Builder(
+                        builder: (context) {
+                          final theme = Theme.of(context);
+                          final isDark = theme.brightness == Brightness.dark;
+                          final authState = context.watch<AuthBloc>().state;
+                          String? name;
+                          if (authState is AuthAuthenticated) {
+                            final user = authState.user;
+                            final candidate = (user.name ?? '').trim();
+                            name = candidate.isNotEmpty
+                                ? candidate
+                                : user.email.split('@').first;
+                          }
+
+                          final titleStyle = theme.textTheme.headlineSmall
+                              ?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? Colors.white.withOpacity(0.95)
+                                : Colors.black87,
+                          );
+                          final subtitleStyle =
+                              theme.textTheme.bodyMedium?.copyWith(
+                            color:
+                                isDark ? Colors.white70 : Colors.black54,
+                          );
+
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                name != null
+                                    ? 'Bienvenido, $name'
+                                    : 'Bienvenido a Wanderly',
+                                textAlign: TextAlign.center,
+                                style: titleStyle,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Tu compañero de viaje. Pregúntame sobre lugares, rutas y planes.',
+                                textAlign: TextAlign.center,
+                                style: subtitleStyle,
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   );
                 }
@@ -752,7 +795,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Drawer _buildMainDrawer() {
-    final authState = context.read<AuthBloc>().state;
+    // Observar el estado de autenticación para refrescar el nombre
+    final authState = context.watch<AuthBloc>().state;
     final userName = authState is AuthAuthenticated
         ? (authState.user.name ?? authState.user.email)
         : 'Invitado';
@@ -813,30 +857,59 @@ class _HomePageState extends State<HomePage> {
             ListTile(
               leading: const Icon(Icons.history),
               title: const Text('Historial'),
+              enabled: _chatInicializado,
               onTap: () async {
+                if (!_chatInicializado) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Preparando el chat… intenta de nuevo en un momento'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  return;
+                }
+
                 Navigator.pop(context);
-                final uid =
-                    (context.read<AuthBloc>().state as AuthAuthenticated)
-                        .user
-                        .id;
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        HistoryPage(chatRepository: _chatRepo, userId: uid),
-                  ),
-                );
-                if (result is Map && result['newSessionId'] != null) {
-                  // Resetear el chat para iniciar conversación limpia
-                  if (_chatInicializado) {
-                    _chatBloc.add(const ResetChatEvent());
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Chat nuevo iniciado'),
-                        duration: Duration(seconds: 2),
+                final state = context.read<AuthBloc>().state;
+                if (state is! AuthAuthenticated) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Primero inicia sesión para ver tu historial'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  return;
+                }
+
+                final uid = state.user.id;
+                try {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => HistoryPage(
+                        chatRepository: _chatRepo,
+                        userId: uid,
                       ),
-                    );
+                    ),
+                  );
+                  if (result is Map && result['newSessionId'] != null) {
+                    if (_chatInicializado) {
+                      _chatBloc.add(const ResetChatEvent());
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Chat nuevo iniciado'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
                   }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('No se pudo abrir el historial: $e'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
                 }
               },
             ),

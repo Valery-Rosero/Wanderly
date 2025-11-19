@@ -31,5 +31,16 @@ class UsersRemoteDataSource {
       'base_lat': perfil.baseLat,
       'base_lon': perfil.baseLon,
     });
+
+    // Mantener sincronizado el nombre también en el metadata del usuario
+    try {
+      await _supabase.auth.updateUser(
+        UserAttributes(data: {
+          'full_name': perfil.name,
+        }),
+      );
+    } catch (_) {
+      // Silencioso: si falla metadata, al menos la tabla users queda actualizada
+    }
   }
 }

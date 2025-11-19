@@ -22,6 +22,9 @@ class _InputChatWidgetState extends State<InputChatWidget> {
 //profe no nos regañe trae no sirve :(
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return SafeArea(
       top: false,
       child: Padding(
@@ -34,9 +37,26 @@ class _InputChatWidgetState extends State<InputChatWidget> {
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    decoration: const InputDecoration(
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    cursorColor: scheme.primary,
+                    decoration: InputDecoration(
+                      filled: true,
+                      // Forzar colores para alto contraste en modo oscuro
+                      fillColor:
+                          isDark ? const Color(0xFF1F2937) : const Color(0xFFF4EFE6),
                       hintText: 'Pregunta a Wanderly sobre lugares cercanos…',
-                      prefixIcon: Icon(Icons.chat_bubble_outline),
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.grey.shade700,
+                      ),
+                      prefixIcon: const Icon(Icons.chat_bubble_outline),
+                      prefixIconColor:
+                          isDark ? scheme.secondary : scheme.primary,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _enviarMensaje(),
@@ -53,17 +73,21 @@ class _InputChatWidgetState extends State<InputChatWidget> {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: scheme.surface,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
+                            if (!isDark)
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
                           ],
                         ),
-                        child: const Icon(Icons.my_location, color: Colors.blueGrey),
+                        child: Icon(
+                          Icons.my_location,
+                          color: isDark ? scheme.primary : Colors.blueGrey,
+                        ),
                       ),
                     ),
                   ),
@@ -88,11 +112,12 @@ class _InputChatWidgetState extends State<InputChatWidget> {
                               gradient: AppTheme.accentGradient,
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.08),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
+                                if (!isDark)
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
                               ],
                             ),
                             child: const Icon(Icons.send_rounded, color: Colors.white),

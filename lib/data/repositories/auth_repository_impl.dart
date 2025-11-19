@@ -96,17 +96,39 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Stream<UserEntity?> get currentUser {
-    return _supabase.auth.onAuthStateChange.map((authState) {
+    // Leer siempre el nombre desde la tabla 'users' cuando haya sesión,
+    // con fallback a metadata 'full_name' si no existe.
+    return _supabase.auth.onAuthStateChange.asyncMap((authState) async {
       final user = authState.session?.user;
-      if (user != null) {
+      if (user == null) return null;
+      try {
+        final response = await _supabase
+            .from('users')
+            .select('id, first_name, profile_picture')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        final name = (response != null
+                ? response['first_name'] as String?
+                : null) ??
+            (user.userMetadata?['full_name'] as String?);
+
+        return UserEntity(
+          id: user.id,
+          email: user.email ?? '',
+          name: name,
+          profilePicture: response?['profile_picture'] as String?,
+          createdAt: DateTime.now(),
+        );
+      } catch (_) {
         return UserEntity(
           id: user.id,
           email: user.email ?? '',
           name: user.userMetadata?['full_name'] as String?,
+          profilePicture: null,
           createdAt: DateTime.now(),
         );
       }
-      return null;
     });
   }
 
@@ -117,7 +139,7 @@ class AuthRepositoryImpl implements AuthRepository {
       if (user != null) {
         final response = await _supabase
             .from('users')
-            .select()
+            .select('id, first_name, profile_picture')
             .eq('id', user.id)
             .maybeSingle();
 
@@ -129,6 +151,7 @@ class AuthRepositoryImpl implements AuthRepository {
             name:
                 response['first_name'] as String? ??
                 (user.userMetadata?['full_name'] as String?),
+            profilePicture: response['profile_picture'] as String?,
             createdAt: DateTime.now(),
           );
         } else {
@@ -136,6 +159,7 @@ class AuthRepositoryImpl implements AuthRepository {
             id: user.id,
             email: user.email ?? '',
             name: user.userMetadata?['full_name'] as String?,
+            profilePicture: null,
             createdAt: DateTime.now(),
           );
         }
