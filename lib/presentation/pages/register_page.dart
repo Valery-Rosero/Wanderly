@@ -30,7 +30,10 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _pickAvatar() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+    );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     try {
@@ -126,11 +129,13 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: BlocConsumer<AuthBloc, AuthState>(
                         listener: (context, state) {
                           if (state is AuthAuthenticated) {
-                            // Si hay avatar seleccionado, subirlo y actualizar perfil
+                            // Si hay avatar seleccionado, subirlo y actualizar profile
                             Future(() async {
                               try {
                                 if (_avatarBytes != null) {
-                                  final storage = AvatarStorageDataSource(sb.Supabase.instance.client);
+                                  final storage = AvatarStorageDataSource(
+                                    sb.Supabase.instance.client,
+                                  );
                                   final url = await storage.uploadAvatar(
                                     userId: state.user.id,
                                     bytes: _avatarBytes!,
@@ -148,7 +153,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                 print('Error subiendo/actualizando avatar: $e');
                               } finally {
                                 if (!mounted) return;
-                                Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+                                Navigator.of(context).pushNamedAndRemoveUntil(
+                                  '/home',
+                                  (route) => false,
+                                );
                               }
                             });
                           } else if (state is AuthError) {
@@ -173,7 +181,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                         ? MemoryImage(_avatarBytes!)
                                         : null,
                                     child: _avatarBytes == null
-                                        ? const Icon(Icons.person, color: Colors.white)
+                                        ? const Icon(
+                                            Icons.person,
+                                            color: Colors.white,
+                                          )
                                         : null,
                                   ),
                                   TextButton.icon(
@@ -189,7 +200,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                     TextButton.icon(
                                       onPressed: isLoading
                                           ? null
-                                          : () => setState(() => _avatarBytes = null),
+                                          : () => setState(
+                                              () => _avatarBytes = null,
+                                            ),
                                       icon: const Icon(Icons.delete_outline),
                                       label: const Text('Quitar'),
                                     ),

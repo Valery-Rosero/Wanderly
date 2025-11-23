@@ -5,11 +5,11 @@ class UsersRemoteDataSource {
   final SupabaseClient _supabase;
   UsersRemoteDataSource(this._supabase);
 
-  Future<UserProfile?> obtenerPerfil(String usuarioId) async {
+  Future<UserProfile?> obtenerprofile(String userId) async {
     final response = await _supabase
         .from('users')
         .select('id, first_name, last_name, home_base, base_lat, base_lon')
-        .eq('id', usuarioId)
+        .eq('id', userId)
         .maybeSingle();
     if (response == null) return null;
     return UserProfile(
@@ -22,31 +22,30 @@ class UsersRemoteDataSource {
     );
   }
 
-  Future<void> actualizarPerfil(UserProfile perfil) async {
+  Future<void> actualizarprofile(UserProfile profile) async {
     await _supabase.from('users').upsert({
-      'id': perfil.userId,
-      'first_name': perfil.name,
-      'last_name': perfil.lastName,
-      'home_base': perfil.locationBase,
-      'base_lat': perfil.baseLat,
-      'base_lon': perfil.baseLon,
+      'id': profile.userId,
+      'first_name': profile.name,
+      'last_name': profile.lastName,
+      'home_base': profile.locationBase,
+      'base_lat': profile.baseLat,
+      'base_lon': profile.baseLon,
     });
 
     // Mantener sincronizado el nombre también en el metadata del usuario
     try {
-      final f = perfil.name?.trim();
-      final l = perfil.lastName?.trim();
-      final combined = ((f != null && f.isNotEmpty) || (l != null && l.isNotEmpty))
-          ? [f, l]
-              .where((s) => s != null && s!.isNotEmpty)
-              .map((s) => s!)
-              .join(' ')
-          : (perfil.name ?? '');
+      final f = profile.name?.trim();
+      final l = profile.lastName?.trim();
+      final combined =
+          ((f != null && f.isNotEmpty) || (l != null && l.isNotEmpty))
+          ? [
+              f,
+              l,
+            ].where((s) => s != null && s!.isNotEmpty).map((s) => s!).join(' ')
+          : (profile.name ?? '');
 
       await _supabase.auth.updateUser(
-        UserAttributes(data: {
-          'full_name': combined,
-        }),
+        UserAttributes(data: {'full_name': combined}),
       );
     } catch (_) {
       // Silencioso: si falla metadata, al menos la tabla users queda actualizada

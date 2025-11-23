@@ -46,8 +46,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _guardarCambios() async {
     final name = _nameController.text.trim();
-    final apellido = _lastnameController.text.trim();
-    final ciudad = _selectedCity;
+    final lastName = _lastnameController.text.trim();
+    final city = _selectedCity;
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -61,7 +61,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     });
 
     try {
-      final fullName = apellido.isNotEmpty ? '$name $apellido' : name;
+      final fullName = lastName.isNotEmpty ? '$name $lastName' : name;
       final client = Supabase.instance.client;
       final user = client.auth.currentUser;
       if (user == null) {
@@ -77,7 +77,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       // Actualizar metadata del user (full_name y city)
       await client.auth.updateUser(
         UserAttributes(
-          data: {'full_name': fullName, if (ciudad != null) 'city': ciudad},
+          data: {'full_name': fullName, if (city != null) 'city': city},
         ),
       );
 
@@ -87,7 +87,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Perfil actualizado')));
+        ).showSnackBar(const SnackBar(content: Text('profile actualizado')));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -106,7 +106,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Editar Perfil'),
+        title: const Text('Editar profile'),
         actions: [
           IconButton(
             onPressed: _toSave ? null : _guardarCambios,
@@ -131,7 +131,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             TextField(
               controller: _lastnameController,
               decoration: const InputDecoration(
-                labelText: 'Apellido',
+                labelText: 'lastName',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -143,10 +143,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   .toList(),
               onChanged: (val) => setState(() => _selectedCity = val),
               decoration: const InputDecoration(
-                labelText: 'Ciudad de origen',
+                labelText: 'city de origen',
                 border: OutlineInputBorder(),
               ),
-              hint: const Text('Selecciona tu ciudad'),
+              hint: const Text('Selecciona tu city'),
             ),
             const SizedBox(height: 24),
             SizedBox(

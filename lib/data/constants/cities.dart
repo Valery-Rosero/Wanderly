@@ -1,4 +1,4 @@
-/// Lista de ciudades de Colombia (capitales departamentales y principales)
+/// Lista de cityes de Colombia (capitales departamentales y principales)
 const List<String> cities = [
   'Arauca',
   'Armenia',

@@ -88,7 +88,7 @@ class ResetChatEvent extends ChatEvent {
 // BLoC
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ChatRepository _chatRepository;
-  final List<ChatMessageEntity> _mensajes = [];
+  final List<ChatMessageEntity> _messages = [];
   List<PlaceEntity> _places = [];
   final String _userId;
 
@@ -96,18 +96,18 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     : _chatRepository = chatRepository,
       _userId = userId,
       super(ChatInitial()) {
-    on<SendMessageEvent>(_onEnviarMensaje);
+    on<SendMessageEvent>(_onToSendMessage);
     on<SaveFavoritePlaceEvent>(_onGuardarLugarFavorito);
     on<LoadChatHistoryEvent>(_onLoadChatHistory);
     on<ResetChatEvent>(_onResetChat);
   }
 
-  Future<void> _onEnviarMensaje(
+  Future<void> _onToSendMessage(
     SendMessageEvent event,
     Emitter<ChatState> emit,
   ) async {
     // Agregar message del user
-    _mensajes.add(
+    _messages.add(
       ChatMessageEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         content: event.message,
@@ -133,7 +133,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       );
 
       final visibleText = _stripJsonSuffix(respuesta);
-      _mensajes.add(
+      _messages.add(
         ChatMessageEntity(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           content: visibleText,
@@ -163,9 +163,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           event.longitude,
         );
       }
-      emit(ChatLoaded(List.from(_mensajes), places: List.from(_places)));
+      emit(ChatLoaded(List.from(_messages), places: List.from(_places)));
     } catch (e) {
-      _mensajes.add(
+      _messages.add(
         ChatMessageEntity(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           content: 'Error: $e',
@@ -173,7 +173,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           timestamp: DateTime.now(),
         ),
       );
-      emit(ChatLoaded(List.from(_mensajes), places: List.from(_places)));
+      emit(ChatLoaded(List.from(_messages), places: List.from(_places)));
     }
   }
 
@@ -186,10 +186,10 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         userId: event.userId,
         limit: event.limit,
       );
-      _mensajes
+      _messages
         ..clear()
         ..addAll(history);
-      emit(ChatLoaded(List.from(_mensajes), places: List.from(_places)));
+      emit(ChatLoaded(List.from(_messages), places: List.from(_places)));
     } catch (e) {
       emit(ChatError('No se pudo cargar historial: $e'));
     }
@@ -199,9 +199,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     ResetChatEvent event,
     Emitter<ChatState> emit,
   ) async {
-    _mensajes.clear();
+    _messages.clear();
     _places = [];
-    emit(ChatLoaded(List.from(_mensajes), places: List.from(_places)));
+    emit(ChatLoaded(List.from(_messages), places: List.from(_places)));
   }
 
   List<PlaceEntity> _parsePlacesFromResponse(String respuesta) {

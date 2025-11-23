@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:wanderly/core/theme/app_theme.dart';
 
 class InputChatWidget extends StatefulWidget {
-  final Function(String) onEnviarMensaje;
+  final Function(String) onToSendMessage;
   final bool estaCargando;
   final VoidCallback? onUsarUbicacion;
 
   const InputChatWidget({
     super.key,
-    required this.onEnviarMensaje,
+    required this.onToSendMessage,
     required this.estaCargando,
     this.onUsarUbicacion,
   });
@@ -19,7 +19,7 @@ class InputChatWidget extends StatefulWidget {
 
 class _InputChatWidgetState extends State<InputChatWidget> {
   final TextEditingController _controller = TextEditingController();
-//profe no nos regañe trae no sirve :(
+  //profe no nos regañe trae no sirve :(
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -44,15 +44,17 @@ class _InputChatWidgetState extends State<InputChatWidget> {
                     decoration: InputDecoration(
                       filled: true,
                       // Forzar colores para alto contraste en modo oscuro
-                      fillColor:
-                          isDark ? const Color(0xFF1F2937) : const Color(0xFFF4EFE6),
+                      fillColor: isDark
+                          ? const Color(0xFF1F2937)
+                          : const Color(0xFFF4EFE6),
                       hintText: 'Pregunta a Wanderly sobre lugares cercanos…',
                       hintStyle: TextStyle(
                         color: isDark ? Colors.white70 : Colors.grey.shade700,
                       ),
                       prefixIcon: const Icon(Icons.chat_bubble_outline),
-                      prefixIconColor:
-                          isDark ? scheme.secondary : scheme.primary,
+                      prefixIconColor: isDark
+                          ? scheme.secondary
+                          : scheme.primary,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -120,7 +122,10 @@ class _InputChatWidgetState extends State<InputChatWidget> {
                                   ),
                               ],
                             ),
-                            child: const Icon(Icons.send_rounded, color: Colors.white),
+                            child: const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                 ),
@@ -134,7 +139,7 @@ class _InputChatWidgetState extends State<InputChatWidget> {
 
   void _enviarMensaje() {
     if (_controller.text.trim().isNotEmpty) {
-      widget.onEnviarMensaje(_controller.text);
+      widget.onToSendMessage(_controller.text);
       _controller.clear();
     }
   }

@@ -19,7 +19,7 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  // Sesiones y mensajes de Supabase
+  // Sesiones y messages de Supabase
   List<ChatSessionEntity> _sessions = [];
   List<ChatMessageEntity> _messages = [];
   String? _selectedSessionId;
@@ -100,7 +100,7 @@ class _HistoryPageState extends State<HistoryPage> {
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error cargando mensajes: $e')));
+      ).showSnackBar(SnackBar(content: Text('Error cargando messages: $e')));
     }
   }
 
@@ -164,7 +164,11 @@ class _HistoryPageState extends State<HistoryPage> {
                     _selectedSessionId = null;
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Todas las conversaciones han sido eliminadas')),
+                    const SnackBar(
+                      content: Text(
+                        'Todas las conversaciones han sido eliminadas',
+                      ),
+                    ),
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -235,22 +239,26 @@ class _HistoryPageState extends State<HistoryPage> {
                           ChoiceChip(
                             label: const Text('Todo'),
                             selected: _dateFilter == 'all',
-                            onSelected: (_) => setState(() => _dateFilter = 'all'),
+                            onSelected: (_) =>
+                                setState(() => _dateFilter = 'all'),
                           ),
                           ChoiceChip(
                             label: const Text('Hoy'),
                             selected: _dateFilter == 'today',
-                            onSelected: (_) => setState(() => _dateFilter = 'today'),
+                            onSelected: (_) =>
+                                setState(() => _dateFilter = 'today'),
                           ),
                           ChoiceChip(
                             label: const Text('Última semana'),
                             selected: _dateFilter == 'week',
-                            onSelected: (_) => setState(() => _dateFilter = 'week'),
+                            onSelected: (_) =>
+                                setState(() => _dateFilter = 'week'),
                           ),
                           ChoiceChip(
                             label: const Text('Este mes'),
                             selected: _dateFilter == 'month',
-                            onSelected: (_) => setState(() => _dateFilter = 'month'),
+                            onSelected: (_) =>
+                                setState(() => _dateFilter = 'month'),
                           ),
                         ],
                       ),
@@ -320,17 +328,21 @@ class _HistoryPageState extends State<HistoryPage> {
                                   final confirmed = await showDialog<bool>(
                                     context: context,
                                     builder: (ctx) => AlertDialog(
-                                      title: const Text('Eliminar conversación'),
+                                      title: const Text(
+                                        'Eliminar conversación',
+                                      ),
                                       content: const Text(
                                         'Se eliminará la conversación seleccionada en la nube (Supabase). ¿Deseas continuar?',
                                       ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(ctx, false),
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, false),
                                           child: const Text('Cancelar'),
                                         ),
                                         ElevatedButton(
-                                          onPressed: () => Navigator.pop(ctx, true),
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, true),
                                           child: const Text('Eliminar'),
                                         ),
                                       ],
@@ -343,12 +355,24 @@ class _HistoryPageState extends State<HistoryPage> {
                                       );
                                       // Refrescar lista de sesiones
                                       await _loadSessions();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Conversación eliminada')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Conversación eliminada',
+                                          ),
+                                        ),
                                       );
                                     } catch (e) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Error eliminando sesión: $e')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Error eliminando sesión: $e',
+                                          ),
+                                        ),
                                       );
                                     }
                                   }
@@ -357,13 +381,17 @@ class _HistoryPageState extends State<HistoryPage> {
                                   width: 28,
                                   height: 28,
                                   decoration: BoxDecoration(
-                                    color: selected ? Colors.white24 : Colors.black12,
+                                    color: selected
+                                        ? Colors.white24
+                                        : Colors.black12,
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
                                     Icons.delete_outline,
                                     size: 18,
-                                    color: selected ? Colors.white : Colors.black54,
+                                    color: selected
+                                        ? Colors.white
+                                        : Colors.black54,
                                   ),
                                 ),
                               ),
@@ -400,42 +428,41 @@ class _HistoryPageState extends State<HistoryPage> {
                               if (isUser)
                                 Text(
                                   m.content,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                  ),
+                                  style: const TextStyle(color: Colors.white),
                                 )
                               else
                                 MarkdownBody(
                                   data: m.content,
-                                  styleSheet: MarkdownStyleSheet.fromTheme(
-                                    Theme.of(context),
-                                  ).copyWith(
-                                    p: const TextStyle(
-                                      color: Colors.black87,
-                                      height: 1.35,
-                                    ),
-                                    strong: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    h1: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.black87,
-                                    ),
-                                    h2: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.black87,
-                                    ),
-                                    h3: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.black87,
-                                    ),
-                                    listBullet: const TextStyle(
-                                      color: Colors.black87,
-                                    ),
-                                  ),
+                                  styleSheet:
+                                      MarkdownStyleSheet.fromTheme(
+                                        Theme.of(context),
+                                      ).copyWith(
+                                        p: const TextStyle(
+                                          color: Colors.black87,
+                                          height: 1.35,
+                                        ),
+                                        strong: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        h1: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.black87,
+                                        ),
+                                        h2: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.black87,
+                                        ),
+                                        h3: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.black87,
+                                        ),
+                                        listBullet: const TextStyle(
+                                          color: Colors.black87,
+                                        ),
+                                      ),
                                   selectable: false,
                                 ),
                               const SizedBox(height: 6),

@@ -38,10 +38,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late ChatBloc _chatBloc;
   late ChatRepository _chatRepo;
-  Position? _ubicacionActual;
-  latlng.LatLng? _ubicacionSeleccionada;
+  Position? _currentLocation;
+  latlng.LatLng? _selectedLocation;
   bool _loadingLocation = false;
-  String? _errorUbicacion;
+  String? _errorLocation;
   bool _chatInicializado = false;
   final TextEditingController _buscarCtrl = TextEditingController();
   bool _buscandoDireccion = false;
@@ -113,7 +113,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _obtenerUbicacion() async {
     setState(() {
       _loadingLocation = true;
-      _errorUbicacion = null;
+      _errorLocation = null;
     });
 
     try {
@@ -121,7 +121,7 @@ class _HomePageState extends State<HomePage> {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         setState(() {
-          _errorUbicacion =
+          _errorLocation =
               'Los servicios de ubicación están deshabilitados. Por favor, actívalos para una mejor experiencia.';
           _loadingLocation = false;
         });
@@ -134,7 +134,7 @@ class _HomePageState extends State<HomePage> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           setState(() {
-            _errorUbicacion =
+            _errorLocation =
                 'Para brindarte sugerencias personalizadas, necesitamos acceso a tu ubicación. Puedes habilitarlo en la configuración.';
             _loadingLocation = false;
           });
@@ -144,7 +144,7 @@ class _HomePageState extends State<HomePage> {
 
       if (permission == LocationPermission.deniedForever) {
         setState(() {
-          _errorUbicacion =
+          _errorLocation =
               'Los permisos de ubicación están permanentemente denegados. Por favor, habilítalos en la configuración del navegador para obtener sugerencias personalizadas.';
           _loadingLocation = false;
         });
@@ -180,9 +180,9 @@ class _HomePageState extends State<HomePage> {
       }
 
       setState(() {
-        _ubicacionActual = position;
+        _currentLocation = position;
         _loadingLocation = false;
-        _errorUbicacion = null;
+        _errorLocation = null;
       });
 
       // Auto-center map on user location with high precision
@@ -199,7 +199,7 @@ class _HomePageState extends State<HomePage> {
       print('📍 Coordenadas: ${position.latitude}, ${position.longitude}');
     } catch (e) {
       setState(() {
-        _errorUbicacion =
+        _errorLocation =
             'No pudimos obtener tu ubicación en este momento. Puedes seleccionar manualmente un lugar en el mapa.';
         _loadingLocation = false;
       });
@@ -223,17 +223,17 @@ class _HomePageState extends State<HomePage> {
         ).listen(
           (Position position) {
             // Only update if the new position is significantly more accurate or different
-            if (_ubicacionActual == null ||
-                position.accuracy < _ubicacionActual!.accuracy ||
+            if (_currentLocation == null ||
+                position.accuracy < _currentLocation!.accuracy ||
                 Geolocator.distanceBetween(
-                      _ubicacionActual!.latitude,
-                      _ubicacionActual!.longitude,
+                      _currentLocation!.latitude,
+                      _currentLocation!.longitude,
                       position.latitude,
                       position.longitude,
                     ) >
                     10) {
               setState(() {
-                _ubicacionActual = position;
+                _currentLocation = position;
               });
 
               print(
@@ -267,7 +267,7 @@ class _HomePageState extends State<HomePage> {
         );
       } else {
         setState(() {
-          _ubicacionSeleccionada = result;
+          _selectedLocation = result;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -305,8 +305,8 @@ class _HomePageState extends State<HomePage> {
     }
 
     // Usar preferentemente la ubicación seleccionada manualmente; si no, la actual.
-    final hasSelected = _ubicacionSeleccionada != null;
-    final hasCurrent = _ubicacionActual != null;
+    final hasSelected = _selectedLocation != null;
+    final hasCurrent = _currentLocation != null;
     if (!hasSelected && !hasCurrent) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -319,11 +319,11 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     final double lat = hasSelected
-        ? _ubicacionSeleccionada!.latitude
-        : _ubicacionActual!.latitude;
+        ? _selectedLocation!.latitude
+        : _currentLocation!.latitude;
     final double lng = hasSelected
-        ? _ubicacionSeleccionada!.longitude
-        : _ubicacionActual!.longitude;
+        ? _selectedLocation!.longitude
+        : _currentLocation!.longitude;
     _chatBloc.add(
       SendMessageEvent(message: message, latitude: lat, longitude: lng),
     );
@@ -429,7 +429,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           // Se elimina el banner superior; el saludo se muestra centrado en el chat
           const SizedBox(height: 8),
-          if (_errorUbicacion != null && _ubicacionActual == null)
+          if (_errorLocation != null && _currentLocation == null)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -444,7 +444,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      _errorUbicacion!,
+                      _errorLocation!,
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -473,10 +473,10 @@ class _HomePageState extends State<HomePage> {
                     ),
                   );
                 } else if (state is ChatLoaded) {
-                  final mensajes = state.messages;
+                  final messages = state.messages;
                   _focusLastUserMessageSoon();
                   // Si el historial está vacío, mostrar el texto de bienvenida centrado.
-                  if (mensajes.isEmpty) {
+                  if (messages.isEmpty) {
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -533,8 +533,8 @@ class _HomePageState extends State<HomePage> {
                   }
                   // Índice del último mensaje enviado por el usuario
                   int lastUserIndex = -1;
-                  for (int i = mensajes.length - 1; i >= 0; i--) {
-                    if (mensajes[i].isUser) {
+                  for (int i = messages.length - 1; i >= 0; i--) {
+                    if (messages[i].isUser) {
                       lastUserIndex = i;
                       break;
                     }
@@ -543,10 +543,10 @@ class _HomePageState extends State<HomePage> {
                     controller: _chatScrollController,
                     cacheExtent: 1000,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    itemCount: mensajes.length,
+                    itemCount: messages.length,
                     itemBuilder: (context, i) {
-                      final m = mensajes[i];
-                      final isLastBot = !m.isUser && i == mensajes.length - 1;
+                      final m = messages[i];
+                      final isLastBot = !m.isUser && i == messages.length - 1;
                       // Asignar clave al último mensaje del usuario para poder enfocarlo
                       return Container(
                         key: (i == lastUserIndex && m.isUser)
@@ -570,8 +570,8 @@ class _HomePageState extends State<HomePage> {
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: () {
-                            final lat = _ubicacionActual?.latitude ?? 0.0;
-                            final lon = _ubicacionActual?.longitude ?? 0.0;
+                            final lat = _currentLocation?.latitude ?? 0.0;
+                            final lon = _currentLocation?.longitude ?? 0.0;
                             _chatBloc.add(
                               SendMessageEvent(
                                 message: 'Hola',
@@ -655,7 +655,7 @@ class _HomePageState extends State<HomePage> {
                         : 8,
                   ),
                   child: InputChatWidget(
-                    onEnviarMensaje: _enviarMensaje,
+                    onToSendMessage: _enviarMensaje,
                     estaCargando: state is ChatLoading,
                     onUsarUbicacion: _obtenerUbicacion,
                   ),
@@ -769,8 +769,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openMapForPlace(PlaceEntity place, List<PlaceEntity> places) async {
-    final userLoc = _ubicacionActual != null
-        ? latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude)
+    final userLoc = _currentLocation != null
+        ? latlng.LatLng(_currentLocation!.latitude, _currentLocation!.longitude)
         : null;
     await Navigator.push(
       context,
@@ -785,9 +785,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  String? _extraerUltimoMensajeBot(List<ChatMessageEntity> mensajes) {
-    for (int i = mensajes.length - 1; i >= 0; i--) {
-      final m = mensajes[i];
+  String? _extraerUltimoMensajeBot(List<ChatMessageEntity> messages) {
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final m = messages[i];
       if (m.isUser == false && (m.content.isNotEmpty)) {
         return m.content;
       }
@@ -815,7 +815,7 @@ class _HomePageState extends State<HomePage> {
         displayAvatarUrl = '$userAvatarUrl${sep}cb=${userAvatarUrl.hashCode}';
       }
     }
-    final hasLocation = _ubicacionActual != null;
+    final hasLocation = _currentLocation != null;
 
     return Drawer(
       child: SafeArea(
@@ -836,10 +836,13 @@ class _HomePageState extends State<HomePage> {
                         radius: 22,
                         backgroundColor: Colors.white24,
                         backgroundImage:
-                            (displayAvatarUrl != null && displayAvatarUrl.isNotEmpty)
+                            (displayAvatarUrl != null &&
+                                displayAvatarUrl.isNotEmpty)
                             ? NetworkImage(displayAvatarUrl)
                             : null,
-                        child: (displayAvatarUrl == null || displayAvatarUrl.isEmpty)
+                        child:
+                            (displayAvatarUrl == null ||
+                                displayAvatarUrl.isEmpty)
                             ? const Icon(Icons.person, color: Colors.white)
                             : null,
                       ),
@@ -861,7 +864,7 @@ class _HomePageState extends State<HomePage> {
             ),
             ListTile(
               leading: const Icon(Icons.person),
-              title: const Text('Perfil'),
+              title: const Text('profile'),
               onTap: () async {
                 Navigator.pop(context);
                 await Navigator.push(
@@ -1008,7 +1011,7 @@ class _HomePageState extends State<HomePage> {
               ),
               title: Text(
                 hasLocation
-                    ? 'Ubicación actual: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, ${_ubicacionActual!.longitude.toStringAsFixed(4)}'
+                    ? 'Ubicación actual: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}'
                     : 'Permitir ubicación',
               ),
               onTap: () {
@@ -1019,7 +1022,7 @@ class _HomePageState extends State<HomePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Ubicación: ${_ubicacionActual!.latitude.toStringAsFixed(4)}, ${_ubicacionActual!.longitude.toStringAsFixed(4)}',
+                        'Ubicación: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}',
                       ),
                     ),
                   );
@@ -1042,7 +1045,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildMap(List<PlaceEntity> places) {
-    if (_ubicacionActual == null && _ubicacionSeleccionada == null) {
+    if (_currentLocation == null && _selectedLocation == null) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: Container(
@@ -1065,8 +1068,8 @@ class _HomePageState extends State<HomePage> {
     }
 
     final center =
-        _ubicacionSeleccionada ??
-        latlng.LatLng(_ubicacionActual!.latitude, _ubicacionActual!.longitude);
+        _selectedLocation ??
+        latlng.LatLng(_currentLocation!.latitude, _currentLocation!.longitude);
 
     final markers = <Marker>[
       // Enhanced user location marker
@@ -1190,7 +1193,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   onTap: (tapPos, point) {
                     setState(() {
-                      _ubicacionSeleccionada = point;
+                      _selectedLocation = point;
                     });
                   },
                   onMapEvent: (MapEvent mapEvent) {
@@ -1541,14 +1544,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _centerOnUserLocation() {
-    if (_ubicacionActual != null) {
+    if (_currentLocation != null) {
       final userLocation = latlng.LatLng(
-        _ubicacionActual!.latitude,
-        _ubicacionActual!.longitude,
+        _currentLocation!.latitude,
+        _currentLocation!.longitude,
       );
       _mapController.move(userLocation, 15.0);
       setState(() {
-        _ubicacionSeleccionada = userLocation;
+        _selectedLocation = userLocation;
       });
     }
   }
@@ -1632,15 +1635,15 @@ class _HomePageState extends State<HomePage> {
 
     // Update selected location
     setState(() {
-      _ubicacionSeleccionada = placeLocation;
+      _selectedLocation = placeLocation;
     });
 
     // Draw route from current location if available
     try {
-      if (_ubicacionActual != null) {
+      if (_currentLocation != null) {
         final points = await _routing.getRoute(
-          startLat: _ubicacionActual!.latitude,
-          startLon: _ubicacionActual!.longitude,
+          startLat: _currentLocation!.latitude,
+          startLon: _currentLocation!.longitude,
           endLat: place.latitude,
           endLon: place.longitude,
           mode: _routingMode,
@@ -1699,12 +1702,12 @@ class _HomePageState extends State<HomePage> {
   // Recalcular la ruta del mapa embebido según el modo seleccionado
   Future<void> _recalculateEmbeddedRoute() async {
     try {
-      if (_ubicacionActual != null && _ubicacionSeleccionada != null) {
+      if (_currentLocation != null && _selectedLocation != null) {
         final points = await _routing.getRoute(
-          startLat: _ubicacionActual!.latitude,
-          startLon: _ubicacionActual!.longitude,
-          endLat: _ubicacionSeleccionada!.latitude,
-          endLon: _ubicacionSeleccionada!.longitude,
+          startLat: _currentLocation!.latitude,
+          startLon: _currentLocation!.longitude,
+          endLat: _selectedLocation!.latitude,
+          endLon: _selectedLocation!.longitude,
           mode: _routingMode,
         );
         setState(() {

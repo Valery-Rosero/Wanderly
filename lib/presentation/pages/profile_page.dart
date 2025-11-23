@@ -44,10 +44,10 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _cities = List<String>.from(cities);
-    _cargarPerfil();
+    _cargarprofile();
   }
 
-  Future<void> _cargarPerfil() async {
+  Future<void> _cargarprofile() async {
     final authState = context.read<AuthBloc>().state;
     if (authState is! AuthAuthenticated) {
       setState(() => _loading = false);
@@ -74,7 +74,7 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       }
 
-      final rp = await remote.obtenerPerfil(userId);
+      final rp = await remote.obtenerprofile(userId);
       if (rp != null) {
         _nameCtrl.text = rp.name ?? _nameCtrl.text;
         _locationCtrl.text = rp.locationBase ?? _locationCtrl.text;
@@ -108,7 +108,10 @@ class _ProfilePageState extends State<ProfilePage> {
     final userId = authState.user.id;
 
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+    );
     if (picked == null) return;
 
     // Validar que sea 1:1
@@ -168,7 +171,7 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Inicia sesión para actualizar tu perfil'),
+            content: Text('Inicia sesión para actualizar tu profile'),
           ),
         );
       }
@@ -186,7 +189,7 @@ class _ProfilePageState extends State<ProfilePage> {
       } catch (_) {}
     }
 
-    final perfil = UserProfile(
+    final profile = UserProfile(
       userId: userId,
       name: _toTitleCase(_nameCtrl.text.trim()),
       lastName: null,
@@ -200,18 +203,18 @@ class _ProfilePageState extends State<ProfilePage> {
 
     try {
       if (local != null) {
-        await local.upsertProfile(perfil, markSynced: false);
+        await local.upsertProfile(profile, markSynced: false);
       }
-      await remote.actualizarPerfil(perfil);
+      await remote.actualizarprofile(profile);
       if (local != null) {
-        await local.upsertProfile(perfil, markSynced: true);
+        await local.upsertProfile(profile, markSynced: true);
       }
       // Refrescar estado de autenticación para propagar nombre desde Supabase
       context.read<AuthBloc>().add(CheckAuthStatus());
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Perfil actualizado')));
+        ).showSnackBar(const SnackBar(content: Text('profile actualizado')));
       }
     } catch (e) {
       if (mounted) {
@@ -229,9 +232,11 @@ class _ProfilePageState extends State<ProfilePage> {
     final authState = context.watch<AuthBloc>().state;
     final effectiveAvatarUrl = (_avatarUrl != null && _avatarUrl!.isNotEmpty)
         ? _avatarUrl!
-        : (authState is AuthAuthenticated ? authState.user.profilePicture : null);
+        : (authState is AuthAuthenticated
+              ? authState.user.profilePicture
+              : null);
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil')),
+      appBar: AppBar(title: const Text('profile')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -260,15 +265,19 @@ class _ProfilePageState extends State<ProfilePage> {
                           key: ValueKey(effectiveAvatarUrl ?? 'empty'),
                           radius: 20,
                           backgroundColor: Colors.white24,
-                          backgroundImage: (effectiveAvatarUrl != null && effectiveAvatarUrl.isNotEmpty)
+                          backgroundImage:
+                              (effectiveAvatarUrl != null &&
+                                  effectiveAvatarUrl.isNotEmpty)
                               ? NetworkImage(effectiveAvatarUrl)
                               : null,
-                          child: (effectiveAvatarUrl == null || effectiveAvatarUrl.isEmpty)
+                          child:
+                              (effectiveAvatarUrl == null ||
+                                  effectiveAvatarUrl.isEmpty)
                               ? const Icon(Icons.person, color: Colors.white)
                               : null,
                         ),
                         const Text(
-                          'Tu perfil',
+                          'Tu profile',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,
@@ -277,7 +286,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         TextButton.icon(
                           onPressed: _pickAndUploadAvatar,
-                          icon: const Icon(Icons.camera_alt, color: Colors.white),
+                          icon: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                          ),
                           label: const Text(
                             'Cambiar foto',
                             style: TextStyle(color: Colors.white),
@@ -288,7 +300,10 @@ class _ProfilePageState extends State<ProfilePage> {
                         if (_avatarUrl != null)
                           TextButton.icon(
                             onPressed: _deleteAvatar,
-                            icon: const Icon(Icons.delete_outline, color: Colors.white),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.white,
+                            ),
                             label: const Text(
                               'Eliminar',
                               style: TextStyle(color: Colors.white),
@@ -363,7 +378,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 onChanged: (v) =>
                                     setState(() => _selectedCity = v),
                                 decoration: const InputDecoration(
-                                  labelText: 'Ciudad de origen',
+                                  labelText: 'city de origen',
                                   prefixIcon: Icon(Icons.location_city),
                                 ),
                                 validator: (v) => (v == null || v.isEmpty)

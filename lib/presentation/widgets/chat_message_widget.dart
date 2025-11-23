@@ -476,7 +476,7 @@ class _MensajeChatWidgetState extends State<ChatMessageWidget> {
 
     String? userAvatarUrl;
     if (isUser) {
-      // Observar cambios de autenticación para refrescar avatar cuando se actualiza en perfil
+      // Observar cambios de autenticación para refrescar avatar cuando se actualiza en profile
       final authState = context.watch<AuthBloc>().state;
       if (authState is AuthAuthenticated) {
         userAvatarUrl = authState.user.profilePicture;

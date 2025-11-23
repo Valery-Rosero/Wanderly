@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS public.usuarios (
   id UUID PRIMARY KEY,
   email TEXT,
   nombre TEXT,
-  foto_perfil TEXT,
-  ciudad TEXT,
+  foto_profile TEXT,
+  city TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -45,16 +45,16 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'foto_perfil'
+    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'foto_profile'
   ) THEN
-    ALTER TABLE public.usuarios ADD COLUMN foto_perfil TEXT;
+    ALTER TABLE public.usuarios ADD COLUMN foto_profile TEXT;
   END IF;
 
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'ciudad'
+    WHERE table_schema = 'public' AND table_name = 'usuarios' AND column_name = 'city'
   ) THEN
-    ALTER TABLE public.usuarios ADD COLUMN ciudad TEXT;
+    ALTER TABLE public.usuarios ADD COLUMN city TEXT;
   END IF;
 
   IF NOT EXISTS (

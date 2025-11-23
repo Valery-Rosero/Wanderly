@@ -111,11 +111,8 @@ class ChatRemoteDataSource {
   Future<void> deleteSession(String sessionId) async {
     try {
       print('🟦 [Supabase] deleteSession id=$sessionId');
-      // Primero borrar mensajes asociados (por si no hay cascada)
-      await _client
-          .from('chat_messages')
-          .delete()
-          .eq('session_id', sessionId);
+      // Primero borrar messages asociados (por si no hay cascada)
+      await _client.from('chat_messages').delete().eq('session_id', sessionId);
       // Luego borrar la sesión
       await _client.from('chat_sessions').delete().eq('id', sessionId);
       print('✅ [Supabase] session deleted id=$sessionId');
@@ -131,11 +128,8 @@ class ChatRemoteDataSource {
       final sessions = await listSessions(userId);
       final ids = sessions.map((s) => s['id']).toList();
       if (ids.isNotEmpty) {
-        // Borrar las sesiones por id (con cascada a mensajes)
-        await _client
-            .from('chat_sessions')
-            .delete()
-            .inFilter('id', ids);
+        // Borrar las sesiones por id (con cascada a messages)
+        await _client.from('chat_sessions').delete().inFilter('id', ids);
       }
       print('✅ [Supabase] all sessions deleted for user=$userId');
     } catch (e) {
